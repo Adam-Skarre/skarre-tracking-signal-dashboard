@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 
-st.title('🚀 Comprehensive Skar Tracking Signal Dashboard with Live Data & Backtest')
+st.title(' Skar Tracking Signal Dashboard with Live Data & Backtest')
 
 # Sidebar Inputs
 ticker = st.sidebar.text_input('Enter Stock Ticker', value='TSLA').upper()
