@@ -26,23 +26,24 @@ if data.empty:
     st.stop()
 
 data['Return'] = data['Price'].pct_change()
-data['Volatility'] = data['Return'].rolling(window=vol_period).std()
+data['Volatility'] = data['Price'].rolling(window=vol_period).std()
 data['MA'] = data['Price'].rolling(window=MA_period).mean()
 data['Skar Signal'] = (data['Price'] - data['MA']) / data['Volatility']
 
 latest_signal = data['Skar Signal'].iloc[-1]
 latest_price = data['Price'].iloc[-1]
 
+signal_status = "✅ Buy" if latest_signal >= entry_threshold else "⏸️ Hold/Cash"
+
 st.metric(label=f"Current {ticker} Price", value=f"${latest_price:.2f}")
-st.metric(label="Current Skar Signal", value=f"{latest_signal:.2f}", delta="✅ Buy" if latest_signal >= entry_threshold else "⏸️ Hold/Cash")
+st.metric(label="Current Skar Signal", value=f"{latest_signal:.2f}", delta=signal_status)
 
 fig = go.Figure()
 fig.add_trace(go.Scatter(x=data.index, y=data['Price'], mode='lines', name=f'{ticker} Price', line=dict(color='blue')))
 fig.add_trace(go.Scatter(x=data.index, y=data['MA'], mode='lines', name=f'{MA_period}-day MA', line=dict(color='orange')))
 
-fig.add_hline(y=data['MA'].iloc[-1] + entry_threshold * data['Volatility'].iloc[-1], 
-              line_dash="dash", line_color="green", 
-              annotation_text="Entry Threshold", annotation_position="top right")
+entry_line = data['MA'].iloc[-1] + entry_threshold * data['Volatility'].iloc[-1]
+fig.add_hline(y=entry_line, line_dash="dash", line_color="green", annotation_text="Entry Threshold", annotation_position="top right")
 
 fig.update_layout(title=f'{ticker} Price & Skar Signal', xaxis_title='Date', yaxis_title='Price ($)', hovermode='x unified')
 st.plotly_chart(fig, use_container_width=True)
