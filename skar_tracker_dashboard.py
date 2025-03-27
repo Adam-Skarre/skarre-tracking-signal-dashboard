@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 
-st.title(' Skar Tracking Signal Dashboard with Live Data & Backtest')
+st.title(' Skarre Tracking Signal Dashboard with Live Data & Backtest')
 
 # Sidebar Inputs
 ticker = st.sidebar.text_input('Enter Stock Ticker', value='TSLA').upper()
@@ -34,12 +34,12 @@ data['MA'] = data['Price'].rolling(window=MA_period).mean()
 data['Skar Signal'] = (data['Price'] - data['MA']) / data['Volatility']
 
 # Live metrics
-latest_signal = data['Skar Signal'].iloc[-1]
+latest_signal = data['Skarre Signal'].iloc[-1]
 latest_price = data['Price'].iloc[-1]
 
 signal_status = "✅ Buy" if latest_signal >= entry_threshold else "⏸️ Hold/Cash"
 st.metric(label=f"Current {ticker} Price", value=f"${latest_price:.2f}")
-st.metric(label="Current Skar Signal", value=f"{latest_signal:.2f}", delta=signal_status)
+st.metric(label="Current Skarre Signal", value=f"{latest_signal:.2f}", delta=signal_status)
 
 # Enhanced Backtesting logic
 initial_capital = 100000
@@ -50,7 +50,7 @@ portfolio_values = []
 peak_price = 0
 
 for i in range(len(data)):
-    signal = data['Skar Signal'].iloc[i]
+    signal = data['Skarre Signal'].iloc[i]
     price = data['Price'].iloc[i]
 
     if position == 0 and signal >= entry_threshold:
@@ -101,12 +101,12 @@ fig.add_trace(go.Scatter(x=data.index, y=data['Price'], mode='lines', name=f'{ti
 fig.add_trace(go.Scatter(x=data.index, y=data['MA'], mode='lines', name=f'{MA_period}-day MA', line=dict(color='orange')))
 entry_line = data['MA'].iloc[-1] + entry_threshold * data['Volatility'].iloc[-1]
 fig.add_hline(y=entry_line, line_dash="dash", line_color="green", annotation_text="Entry Threshold", annotation_position="top right")
-fig.update_layout(title=f'{ticker} Price & Skar Signal', xaxis_title='Date', yaxis_title='Price ($)', hovermode='x unified')
+fig.update_layout(title=f'{ticker} Price & Skarre Signal', xaxis_title='Date', yaxis_title='Price ($)', hovermode='x unified')
 st.plotly_chart(fig, use_container_width=True)
 
 # Skar Signal Plot
 fig_signal = go.Figure()
 fig_signal.add_trace(go.Scatter(x=data.index, y=data['Skar Signal'], mode='lines', name='Skar Signal', line=dict(color='purple')))
 fig_signal.add_hline(y=entry_threshold, line_dash="dash", line_color="green", annotation_text="Entry Threshold", annotation_position="top right")
-fig_signal.update_layout(title=f'Skar Signal Over Time for {ticker}', xaxis_title='Date', yaxis_title='Skar Signal (Z-Score)', hovermode='x unified')
+fig_signal.update_layout(title=f'Skarre Signal Over Time for {ticker}', xaxis_title='Date', yaxis_title='Skar Signal (Z-Score)', hovermode='x unified')
 st.plotly_chart(fig_signal, use_container_width=True)
