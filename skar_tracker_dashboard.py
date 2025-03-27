@@ -31,7 +31,7 @@ if data.empty:
 data['Return'] = data['Price'].pct_change()
 data['Volatility'] = data['Price'].rolling(window=vol_period).std()
 data['MA'] = data['Price'].rolling(window=MA_period).mean()
-data['Skar Signal'] = (data['Price'] - data['MA']) / data['Volatility']
+data['Skarre Signal'] = (data['Price'] - data['MA']) / data['Volatility']
 
 # Live metrics
 latest_signal = data['Skar Signal'].iloc[-1]
@@ -50,7 +50,7 @@ portfolio_values = []
 peak_price = 0
 
 for i in range(len(data)):
-    signal = data['Skarre Signal'].iloc[i]
+    signal = data['Skar Signal'].iloc[i]
     price = data['Price'].iloc[i]
 
     if position == 0 and signal >= entry_threshold:
