@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 
-st.title(' Skarre Tracking Signal Dashboard with Live Data & Backtest')
+st.title('Skarre Tracking Signal Dashboard with Live Data & Backtest')
 
 # Sidebar Inputs
 ticker = st.sidebar.text_input('Enter Stock Ticker', value='TSLA').upper()
@@ -34,7 +34,7 @@ data['MA'] = data['Price'].rolling(window=MA_period).mean()
 data['Skarre Signal'] = (data['Price'] - data['MA']) / data['Volatility']
 
 # Live metrics
-latest_signal = data['Skar Signal'].iloc[-1]
+latest_signal = data['Skarre Signal'].iloc[-1]
 latest_price = data['Price'].iloc[-1]
 
 signal_status = "✅ Buy" if latest_signal >= entry_threshold else "⏸️ Hold/Cash"
@@ -50,7 +50,7 @@ portfolio_values = []
 peak_price = 0
 
 for i in range(len(data)):
-    signal = data['Skar Signal'].iloc[i]
+    signal = data['Skarre Signal'].iloc[i]
     price = data['Price'].iloc[i]
 
     if position == 0 and signal >= entry_threshold:
@@ -104,9 +104,9 @@ fig.add_hline(y=entry_line, line_dash="dash", line_color="green", annotation_tex
 fig.update_layout(title=f'{ticker} Price & Skarre Signal', xaxis_title='Date', yaxis_title='Price ($)', hovermode='x unified')
 st.plotly_chart(fig, use_container_width=True)
 
-# Skar Signal Plot
+# Skarre Signal Plot
 fig_signal = go.Figure()
-fig_signal.add_trace(go.Scatter(x=data.index, y=data['Skar Signal'], mode='lines', name='Skar Signal', line=dict(color='purple')))
+fig_signal.add_trace(go.Scatter(x=data.index, y=data['Skarre Signal'], mode='lines', name='Skarre Signal', line=dict(color='purple')))
 fig_signal.add_hline(y=entry_threshold, line_dash="dash", line_color="green", annotation_text="Entry Threshold", annotation_position="top right")
-fig_signal.update_layout(title=f'Skarre Signal Over Time for {ticker}', xaxis_title='Date', yaxis_title='Skar Signal (Z-Score)', hovermode='x unified')
+fig_signal.update_layout(title=f'Skarre Signal Over Time for {ticker}', xaxis_title='Date', yaxis_title='Skarre Signal (Z-Score)', hovermode='x unified')
 st.plotly_chart(fig_signal, use_container_width=True)
