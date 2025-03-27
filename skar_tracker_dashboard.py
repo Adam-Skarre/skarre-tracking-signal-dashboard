@@ -34,7 +34,7 @@ data['MA'] = data['Price'].rolling(window=MA_period).mean()
 data['Skar Signal'] = (data['Price'] - data['MA']) / data['Volatility']
 
 # Live metrics
-latest_signal = data['Skarre Signal'].iloc[-1]
+latest_signal = data['Skar Signal'].iloc[-1]
 latest_price = data['Price'].iloc[-1]
 
 signal_status = "✅ Buy" if latest_signal >= entry_threshold else "⏸️ Hold/Cash"
