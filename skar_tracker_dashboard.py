@@ -15,12 +15,15 @@ from scipy.stats import linregress
 def get_data(ticker, start, end):
     """
     Download historical data using yfinance.
-    If "Adj Close" is missing, fallback to "Close".
+    Flattens multi-index columns if necessary.
     """
     df = yf.download(ticker, start=start, end=end)
     if df.empty:
         st.error("No data returned. Please check the ticker and date range.")
         return df
+    # Flatten multi-index columns if needed
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(1)
     df.dropna(inplace=True)
     if 'Adj Close' in df.columns:
         df['Return'] = df['Adj Close'].pct_change()
@@ -48,6 +51,7 @@ def compute_skarre_signal(df, ma_window=150, vol_window=14):
     df['MA'] = df[price_col].rolling(window=ma_window, min_periods=1).mean()
     df['Deviation'] = df[price_col] - df['MA']
     df['Vol'] = df['Deviation'].rolling(window=vol_window, min_periods=1).std()
+    # Compute the signal; avoid division by zero
     df['Skarre_Signal'] = df.apply(lambda row: (row['Deviation'] / row['Vol']) if row['Vol'] != 0 else 0, axis=1)
     return df
 
