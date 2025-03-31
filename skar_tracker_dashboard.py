@@ -312,7 +312,8 @@ with tab1:
         name=f'{ma_window}-day MA',
         line=dict(color='orange')
     ))
-    entry_line = df['MA'].iloc[-1] + entry_threshold * df['Volatility'].iloc[-1]
+    # Use "Vol" column (computed in compute_skarre_signal) for volatility
+    entry_line = df['MA'].iloc[-1] + entry_threshold * df['Vol'].iloc[-1]
     fig_live.add_hline(
         y=entry_line,
         line_dash="dash",
@@ -418,25 +419,25 @@ with tab6:
     **Mission & Vision**  
     The Skarre Tracking Signal Dashboard is a comprehensive quantitative tool designed to analyze market dynamics 
     and identify potential trading opportunities using a proprietary signal methodology. Our mission is to combine 
-    advanced statistical analysis, backtesting, and innovative polynomial trend analysis to empower traders and 
-    researchers with actionable insights.
-
+    advanced statistical analysis, robust backtesting, and innovative polynomial trend analysis to empower users 
+    with actionable insights for informed decision-making.
+    
     **Overview of the Approach**  
-    - **Data & Signals:** Historical price data is used to compute a central moving average and a signal (expressed 
-      as a Z-score) that highlights deviations from typical price behavior.  
-    - **Backtesting:** The dashboard simulates a trading strategy based on the signal, comparing its performance 
-      with a traditional buy-and-hold strategy to evaluate risk and reward.  
-    - **Polynomial Analysis:** By fitting quadratic models over rolling windows, the tool captures parabolic trends 
-      in market data, offering a unique perspective on market curvature and momentum.
+    - **Data & Signals:** Historical price data is processed to compute a central moving average and a signal (as a Z-score) 
+      that highlights deviations from typical price behavior.  
+    - **Backtesting:** The strategy simulates trades based on the signal, comparing its performance with a traditional 
+      buy-and-hold approach to evaluate risk and reward.  
+    - **Polynomial Analysis:** Rolling quadratic fits capture parabolic trends in the market, providing a unique view 
+      of market curvature and momentum.
+    - **Live Graph:** An interactive Plotly graph displays real-time price data with dynamic annotations.
     
     **Our Goal**  
-    We aim to deliver a professional-grade quantitative analysis platform that is both robust and intuitive, enabling 
-    users to explore a wide range of market scenarios and refine their trading strategies. While the exact formulation 
-    of our proprietary signal remains confidential, the dashboard provides rich visualization and performance metrics 
-    to support informed decision-making.
-
+    Our aim is to deliver a professional-grade quantitative analysis platform that is both robust and intuitive. 
+    While certain aspects of our proprietary signal remain confidential, the dashboard offers rich analytics and visualization 
+    to foster further research and refinement of algorithmic trading strategies.
+    
     **Explore & Experiment**  
-    Adjust the parameters via the sidebar to see how the signal behaves under different conditions. Your feedback 
-    is invaluable as we continue to enhance this tool and push the boundaries of quantitative market analysis.
+    Adjust the parameters in the sidebar to explore different market scenarios and discover how the signal performs 
+    under various conditions. Your feedback is vital as we continue to enhance this tool.
     """)
     st.write("Thank you for exploring the Skarre Tracking Signal Dashboard. We welcome your feedback!")
