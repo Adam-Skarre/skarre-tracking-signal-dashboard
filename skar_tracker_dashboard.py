@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 from scipy.stats import linregress
+import plotly.graph_objs as go
 
 # -----------------------
 # Data Download & Processing
@@ -14,12 +15,12 @@ from scipy.stats import linregress
 def get_data(ticker, start, end):
     """
     Download historical data using yfinance.
-    - Flattens multi-index columns.
-    - Normalizes column names to Title Case.
-    - If all 5 columns are identically named, renames them to Open, High, Low, Close, Volume.
-    - Calculates daily returns using 'Adj Close' if available, else 'Close'.
+    - Flatten multi-index columns if needed.
+    - Normalize column names to Title Case.
+    - If all 5 columns are identically named, rename them to Open, High, Low, Close, Volume.
+    - Calculate daily returns using 'Adj Close' if available, else 'Close'.
     """
-    df = yf.download(ticker, start=start, end=end)
+    df = yf.download(ticker, start=start, end=end, progress=False)
     
     if df.empty:
         st.error("No data returned. Please check the ticker and date range.")
@@ -48,8 +49,8 @@ def get_data(ticker, start, end):
 
 def compute_skarre_signal(df, ma_window=150, vol_window=14):
     """
-    Compute the Skarre Signal (Z-score):
-      Z = (Price - MA) / (Rolling Std of (Price - MA))
+    Compute the Skarre Signal (Z-score) as:
+      Z = (Price - Moving Average) / (Rolling Std of (Price - MA))
     Uses 'Adj Close' if available, else 'Close'.
     """
     df = df.copy()
@@ -74,12 +75,12 @@ def backtest_strategy(df,
                       initial_capital=100000):
     """
     Backtest the strategy based on the Skarre Signal.
-    For "Contrarian": buy when signal <= entry_threshold, exit when signal >= exit_threshold.
-    For "Momentum": buy when signal >= entry_threshold, exit when signal <= exit_threshold.
-    Also implements a trailing stop and profit target.
+    - For "Contrarian": buy when signal <= entry_threshold, exit when signal >= exit_threshold.
+    - For "Momentum": buy when signal >= entry_threshold, exit when signal <= exit_threshold.
+    Also applies a trailing stop and profit target.
     
     Returns:
-      - trades: list of trade dictionaries.
+      - trades: List of trade dictionaries.
       - equity_df: DataFrame tracking portfolio equity over time.
       - buy_hold: Series representing buy-and-hold performance.
     """
@@ -143,7 +144,7 @@ def backtest_strategy(df,
 
 def compute_performance_metrics(equity_df, initial_capital):
     """
-    Compute Total Return, CAGR, Sharpe Ratio, Sortino Ratio, and Maximum Drawdown.
+    Compute performance metrics: Total Return, CAGR, Sharpe Ratio, Sortino Ratio, and Maximum Drawdown.
     """
     final_equity = equity_df['Equity'].iloc[-1]
     total_return = final_equity / initial_capital - 1
@@ -166,11 +167,11 @@ def compute_performance_metrics(equity_df, initial_capital):
     max_drawdown = equity_df['Drawdown'].min()
     
     return {
-        "Total Return (%)": round(total_return*100, 2),
-        "CAGR (%)": round(CAGR*100, 2),
+        "Total Return (%)": round(total_return * 100, 2),
+        "CAGR (%)": round(CAGR * 100, 2),
         "Sharpe Ratio": round(sharpe, 2),
         "Sortino Ratio": round(sortino, 2),
-        "Max Drawdown (%)": round(max_drawdown*100, 2)
+        "Max Drawdown (%)": round(max_drawdown * 100, 2)
     }
 
 # -----------------------
@@ -227,7 +228,7 @@ def plot_polynomial_sample(df, window=30):
 
 def plot_price_and_signals(df, trades):
     """
-    Plot the price series (using 'Adj Close' or 'Close'), moving average, and mark trade signals.
+    Plot the price series, moving average, and mark trade signals.
     """
     fig, ax = plt.subplots(figsize=(10, 5))
     price_col = 'Adj Close' if 'Adj Close' in df.columns else 'Close'
@@ -290,21 +291,49 @@ price_col = 'Adj Close' if 'Adj Close' in df.columns else 'Close'
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "Live Graph", "Data & Signals", "Backtest & Comparison", "Performance Metrics",
-    "Polynomial Analysis", "Explanation"
+    "Polynomial Analysis", "About"
 ])
 
-# Tab 1: Live Graph (simulated by page refresh)
+# Tab 1: Live Graph using Plotly
 with tab1:
     st.header("Live Price Graph")
-    placeholder = st.empty()
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(df.index, df[price_col], label='Price', color='blue')
-    ax.set_title("Historical Price Data")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Price")
-    ax.legend()
-    placeholder.pyplot(fig)
-    st.write("This graph refreshes on page reload (approximately every", refresh_interval, "seconds).")
+    fig_live = go.Figure()
+    fig_live.add_trace(go.Scatter(
+        x=df.index,
+        y=df[price_col],
+        mode='lines',
+        name='Price',
+        line=dict(color='blue')
+    ))
+    fig_live.add_trace(go.Scatter(
+        x=df.index,
+        y=df['MA'],
+        mode='lines',
+        name=f'{ma_window}-day MA',
+        line=dict(color='orange')
+    ))
+    entry_line = df['MA'].iloc[-1] + entry_threshold * df['Volatility'].iloc[-1]
+    fig_live.add_hline(
+        y=entry_line,
+        line_dash="dash",
+        line_color="green",
+        annotation_text="Entry Threshold",
+        annotation_position="top right"
+    )
+    fig_live.update_layout(
+        title="Live Price Data",
+        xaxis_title="Date",
+        yaxis_title="Price",
+        hovermode='x unified'
+    )
+    st.plotly_chart(fig_live, use_container_width=True)
+    
+    latest_price = df[price_col].iloc[-1]
+    latest_signal = df['Skarre_Signal'].iloc[-1]
+    signal_status = "✅ Buy" if latest_signal >= entry_threshold else "⏸️ Hold/Cash"
+    st.metric(label=f"Current {ticker} Price", value=f"${latest_price:.2f}")
+    st.metric(label="Current Skarre Signal", value=f"{latest_signal:.2f}", delta=signal_status)
+    st.write("This live graph updates on page reload (approximately every", refresh_interval, "seconds).")
 
 # Tab 2: Data & Signals
 with tab2:
@@ -332,7 +361,6 @@ with tab3:
         profit_target=profit_target,
         initial_capital=initial_capital
     )
-    # Ensure trades is defined (empty list if no trades)
     if trades is None:
         trades = []
     
@@ -383,29 +411,32 @@ with tab5:
     st.subheader("Sample Quadratic Fit")
     plot_polynomial_sample(df, window=30)
 
-# Tab 6: Explanation
+# Tab 6: About
 with tab6:
-    st.header("Methodology & Explanation")
+    st.header("About Skarre Tracking Signal")
     st.markdown("""
-    **Central Moving Average & Skarre Signal**  
-    - A central moving average (default 150 days) smooths price data.  
-    - The Skarre Signal is computed as the Z-score:  
-      \\( Z = \\frac{Price - MA}{\\sigma(Price - MA)} \\).  
-    - Extreme values indicate potential buy (low) or sell (high) opportunities.
+    **Mission & Vision**  
+    The Skarre Tracking Signal Dashboard is a comprehensive quantitative tool designed to analyze market dynamics 
+    and identify potential trading opportunities using a proprietary signal methodology. Our mission is to combine 
+    advanced statistical analysis, backtesting, and innovative polynomial trend analysis to empower traders and 
+    researchers with actionable insights.
+
+    **Overview of the Approach**  
+    - **Data & Signals:** Historical price data is used to compute a central moving average and a signal (expressed 
+      as a Z-score) that highlights deviations from typical price behavior.  
+    - **Backtesting:** The dashboard simulates a trading strategy based on the signal, comparing its performance 
+      with a traditional buy-and-hold strategy to evaluate risk and reward.  
+    - **Polynomial Analysis:** By fitting quadratic models over rolling windows, the tool captures parabolic trends 
+      in market data, offering a unique perspective on market curvature and momentum.
     
-    **Backtesting & Comparison**  
-    - The strategy simulates buying when the signal indicates an extreme deviation and selling when it reverts.
-    - A trailing stop and profit target are used to manage risk.
-    - The equity curve of the signal strategy is compared with a traditional buy-and-hold approach.
-    
-    **Polynomial Analysis**  
-    - A quadratic (degree-2) polynomial is fitted on a rolling 30-day window to capture parabolic trends.
-    - The quadratic coefficient (curvature) along with linear and intercept coefficients are analyzed via time series and histograms.
-    
-    **Live Graph**  
-    - The live graph tab displays current price data, refreshing on page reload.
-    
-    This dashboard is structured to provide a comprehensive, professional analysis of the trading strategy.
-    Adjust parameters via the sidebar to explore different scenarios.
+    **Our Goal**  
+    We aim to deliver a professional-grade quantitative analysis platform that is both robust and intuitive, enabling 
+    users to explore a wide range of market scenarios and refine their trading strategies. While the exact formulation 
+    of our proprietary signal remains confidential, the dashboard provides rich visualization and performance metrics 
+    to support informed decision-making.
+
+    **Explore & Experiment**  
+    Adjust the parameters via the sidebar to see how the signal behaves under different conditions. Your feedback 
+    is invaluable as we continue to enhance this tool and push the boundaries of quantitative market analysis.
     """)
-    st.write("Explore all tabs for detailed analysis and insights.")
+    st.write("Thank you for exploring the Skarre Tracking Signal Dashboard. We welcome your feedback!")
