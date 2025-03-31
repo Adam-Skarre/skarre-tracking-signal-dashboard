@@ -180,7 +180,7 @@ def compute_performance_metrics(equity_df, initial_capital):
 def polynomial_analysis(df, window=30):
     """
     For a rolling window, fit a quadratic polynomial (degree=2) to the price data.
-    Returns a DataFrame of coefficients: Quadratic, Linear, Intercept.
+    Returns a DataFrame of coefficients with columns: Quadratic, Linear, Intercept.
     """
     price_col = 'Close' if 'Close' in df.columns else ('Adj Close' if 'Adj Close' in df.columns else None)
     if price_col is None:
@@ -201,7 +201,7 @@ def polynomial_analysis(df, window=30):
 
 def plot_polynomial_sample(df, window=30):
     """
-    Plot a sample quadratic fit over the most recent window.
+    Plot a sample quadratic polynomial fit over the most recent window.
     """
     price_col = 'Close' if 'Close' in df.columns else ('Adj Close' if 'Adj Close' in df.columns else None)
     if price_col is None:
@@ -219,6 +219,36 @@ def plot_polynomial_sample(df, window=30):
     ax.set_xlabel("Date")
     ax.set_ylabel("Price")
     ax.legend()
+    st.pyplot(fig)
+
+# -----------------------
+# Plotting Function for Trade Signals
+# -----------------------
+
+def plot_price_and_signals(df, trades):
+    """
+    Plot the price series (using 'Adj Close' or 'Close'), moving average, and mark trade signals.
+    """
+    fig, ax = plt.subplots(figsize=(10, 5))
+    price_col = 'Adj Close' if 'Adj Close' in df.columns else 'Close'
+    ax.plot(df.index, df[price_col], label='Price', color='blue')
+    ax.plot(df.index, df['MA'], label='Moving Average', color='orange', linestyle='--')
+    
+    for trade in trades:
+        entry_date = trade["Entry Date"]
+        exit_date = trade["Exit Date"]
+        entry_price = trade["Entry Price"]
+        ax.scatter(entry_date, entry_price, marker="^", color="green", s=100, label="Buy")
+        if exit_date:
+            exit_price = trade["Exit Price"]
+            ax.scatter(exit_date, exit_price, marker="v", color="red", s=100, label="Sell")
+    
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys())
+    ax.set_title("Price Chart with Trade Signals")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Price")
     st.pyplot(fig)
 
 # -----------------------
@@ -248,7 +278,6 @@ initial_capital = st.sidebar.number_input("Initial Capital ($)", value=100000, s
 risk_free_rate = st.sidebar.number_input("Risk-Free Rate (annual %)", value=2.0, step=0.1) / 100.0
 refresh_interval = st.sidebar.number_input("Live Graph Refresh (sec)", value=30, step=5)
 
-# Download and process data
 with st.spinner("Downloading data..."):
     df_raw = get_data(ticker, start_date, end_date)
     df = compute_skarre_signal(df_raw, ma_window=ma_window, vol_window=vol_window)
@@ -303,6 +332,10 @@ with tab3:
         profit_target=profit_target,
         initial_capital=initial_capital
     )
+    # Ensure trades is defined (empty list if no trades)
+    if trades is None:
+        trades = []
+    
     st.subheader("Trade Log")
     if trades and len(trades) > 0:
         st.dataframe(pd.DataFrame(trades))
@@ -363,7 +396,7 @@ with tab6:
     **Backtesting & Comparison**  
     - The strategy simulates buying when the signal indicates an extreme deviation and selling when it reverts.
     - A trailing stop and profit target are used to manage risk.
-    - Equity curves of the signal strategy are compared with a traditional buy-and-hold approach.
+    - The equity curve of the signal strategy is compared with a traditional buy-and-hold approach.
     
     **Polynomial Analysis**  
     - A quadratic (degree-2) polynomial is fitted on a rolling 30-day window to capture parabolic trends.
