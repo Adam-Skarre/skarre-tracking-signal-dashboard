@@ -20,17 +20,19 @@ def get_data(ticker, start, end):
     df = yf.download(ticker, start=start, end=end)
     if df.empty:
         st.error("No data returned. Please check the ticker and date range.")
-        return df
+        st.stop()
     # Flatten multi-index columns if needed
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(1)
     df.dropna(inplace=True)
-    if 'Adj Close' in df.columns:
-        df['Return'] = df['Adj Close'].pct_change()
-    elif 'Close' in df.columns:
-        df['Return'] = df['Close'].pct_change()
+    if 'Adj Close' in df.columns or 'Close' in df.columns:
+        if 'Adj Close' in df.columns:
+            df['Return'] = df['Adj Close'].pct_change()
+        else:
+            df['Return'] = df['Close'].pct_change()
     else:
-        st.error("Downloaded data does not contain 'Adj Close' or 'Close' column.")
+        st.error("Downloaded data does not contain 'Adj Close' or 'Close' column. Please check the ticker and date range.")
+        st.stop()
     return df
 
 def compute_skarre_signal(df, ma_window=150, vol_window=14):
@@ -46,12 +48,12 @@ def compute_skarre_signal(df, ma_window=150, vol_window=14):
         price_col = 'Close'
     else:
         st.error("Data does not contain necessary price column.")
-        return df
+        st.stop()
 
     df['MA'] = df[price_col].rolling(window=ma_window, min_periods=1).mean()
     df['Deviation'] = df[price_col] - df['MA']
     df['Vol'] = df['Deviation'].rolling(window=vol_window, min_periods=1).std()
-    # Compute the signal; avoid division by zero
+    # Avoid division by zero
     df['Skarre_Signal'] = df.apply(lambda row: (row['Deviation'] / row['Vol']) if row['Vol'] != 0 else 0, axis=1)
     return df
 
@@ -90,11 +92,11 @@ def backtest_strategy(df,
             price = row['Close']
         else:
             st.error("Price column not found in data.")
-            return trades, pd.DataFrame()
+            st.stop()
             
         signal = row['Skarre_Signal']
         
-        # Record current equity (mark-to-market if in a trade)
+        # Mark-to-market calculation
         if position == 1:
             current_equity = capital * (price / entry_price)
         else:
@@ -115,7 +117,6 @@ def backtest_strategy(df,
                 max_price = price
                 trade = {"Entry Date": date, "Entry Price": price, "Exit Date": None, "Exit Price": None, "Return": None}
                 trades.append(trade)
-        # Exit logic
         else:
             if price > max_price:
                 max_price = price
@@ -192,7 +193,7 @@ def plot_price_and_signals(df, trades):
         price_series = df['Close']
     else:
         st.error("Price column not found in data.")
-        return
+        st.stop()
     ax.plot(df.index, price_series, label='Price', color='blue')
     ax.plot(df.index, df['MA'], label='Moving Average', color='orange', linestyle='--')
     
@@ -205,7 +206,6 @@ def plot_price_and_signals(df, trades):
             exit_price = trade["Exit Price"]
             ax.scatter(exit_date, exit_price, marker="v", color="red", s=100, label="Sell")
     
-    # Remove duplicate legend entries
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
     ax.legend(by_label.values(), by_label.keys())
@@ -291,7 +291,6 @@ def grid_search_optimization(df, strategy, initial_capital, risk_free_rate):
 
 st.title("Skarre Tracker Quantitative Portfolio Dashboard")
 
-# Sidebar: User Inputs
 st.sidebar.header("User Inputs")
 ticker = st.sidebar.text_input("Ticker Symbol", value="SPY")
 start_date = st.sidebar.date_input("Start Date", value=datetime(2010, 1, 1))
@@ -314,12 +313,9 @@ risk_free_rate = st.sidebar.number_input("Risk-Free Rate (annual %)", value=2.0,
 
 with st.spinner("Downloading data..."):
     df_raw = get_data(ticker, start_date, end_date)
-    if df_raw.empty:
-        st.stop()
     df = compute_skarre_signal(df_raw, ma_window=ma_window, vol_window=vol_window)
     df.index = pd.to_datetime(df.index)
 
-# Create Tabs for Organization
 tabs = st.tabs(["Data & Signals", "Backtest", "Performance Metrics", "Rolling Analysis", "Optimization"])
 
 with tabs[0]:
