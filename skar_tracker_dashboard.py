@@ -16,7 +16,8 @@ def get_data(ticker, start, end):
     """
     Download historical data using yfinance.
     Flattens multi-index columns if necessary and normalizes column names.
-    If all columns are the same and there are 5 columns, reassign default names.
+    If all columns are the same and there are 5 columns, reassign default names:
+      Open, High, Low, Close, Volume.
     """
     df = yf.download(ticker, start=start, end=end)
     
@@ -24,24 +25,24 @@ def get_data(ticker, start, end):
         st.error("No data returned. Please check the ticker and date range.")
         st.stop()
     
-    # Flatten multi-index columns if needed
+    # Flatten multi-index columns if needed.
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(1)
     
-    # Normalize column names to title case (e.g., "adj close" -> "Adj Close")
+    # Normalize column names (e.g., "adj close" -> "Adj Close").
     df.columns = [col.title() for col in df.columns]
     
-    # Debug: display available columns
+    # Debug: display downloaded columns.
     st.write("Downloaded data columns:", df.columns.tolist())
     
-    # If all columns are the same and there are exactly 5 columns, assign default names.
+    # If all columns are the same and there are exactly 5 columns, reassign them.
     if len(set(df.columns)) == 1 and df.shape[1] == 5:
         st.warning("All columns have the same name. Reassigning columns to default names: Open, High, Low, Close, Volume.")
         df.columns = ["Open", "High", "Low", "Close", "Volume"]
     
     df.dropna(inplace=True)
     
-    # Check for a valid price column
+    # Check for a valid price column.
     if 'Adj Close' in df.columns or 'Close' in df.columns:
         if 'Adj Close' in df.columns:
             df['Return'] = df['Adj Close'].pct_change()
@@ -84,22 +85,24 @@ def backtest_strategy(df,
                       initial_capital=100000,
                       risk_free_rate=0.02):
     """
-    Backtest a strategy using the Skarre Signal.
+    Backtest a trading strategy based on the Skarre Signal.
     
-    For "Contrarian", enter when signal <= entry_threshold and exit when signal >= exit_threshold.
-    For "Momentum", the logic is reversed.
+    For "Contrarian", the idea is to enter when the signal is very low (<= entry_threshold)
+    and exit when the signal recovers (>= exit_threshold). For "Momentum", the logic is reversed.
     
-    Also includes trailing stop and profit target.
+    This backtest uses an all-in position and includes a trailing stop and profit target.
     
-    Returns a list of trades and a DataFrame of the equity curve.
+    Returns:
+      - trades: A list of dictionaries, each recording entry and exit details.
+      - equity_df: A DataFrame tracking the portfolio's equity over time.
     """
     df = df.copy().reset_index()
-    position = 0      # 0: no position, 1: long position
+    position = 0
     entry_price = 0
-    max_price = 0     # for trailing stop
+    max_price = 0
     capital = initial_capital
-    equity_curve = [] # list of tuples (date, equity value)
-    trades = []       # list of trade dictionaries
+    equity_curve = []  # list of tuples (date, equity value)
+    trades = []        # list of trade dictionaries
     
     for i, row in df.iterrows():
         date = row['Date']
@@ -113,12 +116,11 @@ def backtest_strategy(df,
             
         signal = row['Skarre_Signal']
         
-        if position == 1:
-            current_equity = capital * (price / entry_price)
-        else:
-            current_equity = capital
+        # Calculate current portfolio value (mark-to-market if in position)
+        current_equity = capital * (price / entry_price) if position == 1 else capital
         equity_curve.append((date, current_equity))
         
+        # Entry logic.
         if position == 0:
             if strategy == "Contrarian" and signal <= entry_threshold:
                 position = 1
@@ -133,13 +135,14 @@ def backtest_strategy(df,
                 trade = {"Entry Date": date, "Entry Price": price, "Exit Date": None, "Exit Price": None, "Return": None}
                 trades.append(trade)
         else:
+            # Update maximum price reached since entry (for trailing stop)
             if price > max_price:
                 max_price = price
             exit_trade = False
             if strategy == "Contrarian":
                 if signal >= exit_threshold:
                     exit_trade = True
-            else:  # Momentum strategy
+            else:
                 if signal <= -abs(exit_threshold):
                     exit_trade = True
             if price < max_price * (1 - trailing_stop):
@@ -162,6 +165,10 @@ def backtest_strategy(df,
     return trades, equity_df
 
 def compute_performance_metrics(equity_df, initial_capital, risk_free_rate=0.02):
+    """
+    Compute performance metrics:
+      - Total Return, CAGR, Sharpe Ratio, Sortino Ratio, and Maximum Drawdown.
+    """
     final_equity = equity_df['Equity'].iloc[-1]
     total_return = final_equity / initial_capital - 1
 
@@ -174,11 +181,13 @@ def compute_performance_metrics(equity_df, initial_capital, risk_free_rate=0.02)
     equity_df['Daily Return'] = equity_df['Equity'].pct_change().fillna(0)
     avg_daily_return = equity_df['Daily Return'].mean()
     std_daily_return = equity_df['Daily Return'].std()
-    sharpe = (avg_daily_return - risk_free_rate/252) / std_daily_return * np.sqrt(252) if std_daily_return != 0 else np.nan
+    sharpe = ((avg_daily_return - risk_free_rate/252) / std_daily_return * np.sqrt(252)
+              if std_daily_return != 0 else np.nan)
 
     downside_returns = equity_df['Daily Return'][equity_df['Daily Return'] < 0]
     downside_std = downside_returns.std() if not downside_returns.empty else np.nan
-    sortino = (avg_daily_return - risk_free_rate/252) / downside_std * np.sqrt(252) if downside_std and downside_std != 0 else np.nan
+    sortino = ((avg_daily_return - risk_free_rate/252) / downside_std * np.sqrt(252)
+               if downside_std and downside_std != 0 else np.nan)
 
     equity_df['Cumulative Max'] = equity_df['Equity'].cummax()
     equity_df['Drawdown'] = (equity_df['Equity'] - equity_df['Cumulative Max']) / equity_df['Cumulative Max']
@@ -194,6 +203,10 @@ def compute_performance_metrics(equity_df, initial_capital, risk_free_rate=0.02)
     return metrics
 
 def plot_price_and_signals(df, trades):
+    """
+    Plot the price series (using 'Adj Close' or 'Close'), its moving average,
+    and mark the buy/sell signals.
+    """
     fig, ax = plt.subplots(figsize=(10, 5))
     if 'Adj Close' in df.columns:
         price_series = df['Adj Close']
@@ -214,6 +227,7 @@ def plot_price_and_signals(df, trades):
             exit_price = trade["Exit Price"]
             ax.scatter(exit_date, exit_price, marker="v", color="red", s=100, label="Sell")
     
+    # Remove duplicate legend entries.
     handles, labels = ax.get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
     ax.legend(by_label.values(), by_label.keys())
@@ -223,6 +237,9 @@ def plot_price_and_signals(df, trades):
     st.pyplot(fig)
 
 def plot_skarre_signal(df, entry_threshold, exit_threshold, strategy):
+    """
+    Plot the Skarre Signal (Z-score) over time with horizontal lines for thresholds.
+    """
     fig, ax = plt.subplots(figsize=(10, 3))
     ax.plot(df.index, df['Skarre_Signal'], label='Skarre Signal', color='purple')
     if strategy == "Contrarian":
@@ -238,6 +255,9 @@ def plot_skarre_signal(df, entry_threshold, exit_threshold, strategy):
     st.pyplot(fig)
 
 def plot_equity_curve(equity_df):
+    """
+    Plot the portfolio equity curve over time.
+    """
     fig, ax = plt.subplots(figsize=(10, 4))
     ax.plot(equity_df.index, equity_df['Equity'], color='magenta', label="Strategy Equity")
     ax.set_title("Equity Curve")
@@ -247,17 +267,29 @@ def plot_equity_curve(equity_df):
     st.pyplot(fig)
 
 def rolling_sharpe(equity_df, window=252, risk_free_rate=0.02):
+    """
+    Calculate a rolling Sharpe ratio over a specified window (default ~252 trading days).
+    """
     returns = equity_df['Equity'].pct_change().fillna(0)
     rolling_sharpe = returns.rolling(window=window).apply(
-        lambda x: ((np.mean(x) - risk_free_rate/252) / np.std(x) * np.sqrt(252)) if np.std(x) != 0 else np.nan
+        lambda x: ((np.mean(x) - risk_free_rate/252) / np.std(x) * np.sqrt(252))
+        if np.std(x) != 0 else np.nan
     )
     return rolling_sharpe
 
 def grid_search_optimization(df, strategy, initial_capital, risk_free_rate):
+    """
+    Perform a grid search over entry and exit thresholds to optimize the Sharpe Ratio.
+    Returns:
+      - best_params: a dictionary with the optimal entry and exit thresholds,
+      - best_sharpe: the best Sharpe Ratio,
+      - results_df: a DataFrame of all tested combinations.
+    """
     best_sharpe = -np.inf
     best_params = {"entry_threshold": None, "exit_threshold": None}
     results = []
     
+    # Define threshold ranges based on strategy type.
     entry_range = np.arange(-3.0, -1.0, 0.5) if strategy == "Contrarian" else np.arange(1.0, 3.0, 0.5)
     exit_range = np.arange(0.0, 2.0, 0.5) if strategy == "Contrarian" else np.arange(-2.0, 0.0, 0.5)
     
@@ -270,7 +302,8 @@ def grid_search_optimization(df, strategy, initial_capital, risk_free_rate):
             equity_df_test['Daily Return'] = equity_df_test['Equity'].pct_change().fillna(0)
             avg_ret = equity_df_test['Daily Return'].mean()
             std_ret = equity_df_test['Daily Return'].std()
-            sharpe = (avg_ret - risk_free_rate/252) / std_ret * np.sqrt(252) if std_ret != 0 else np.nan
+            sharpe = ((avg_ret - risk_free_rate/252) / std_ret * np.sqrt(252)
+                      if std_ret != 0 else np.nan)
             results.append((entry_thr, exit_thr, sharpe))
             if sharpe is not np.nan and sharpe > best_sharpe:
                 best_sharpe = sharpe
@@ -286,6 +319,7 @@ def grid_search_optimization(df, strategy, initial_capital, risk_free_rate):
 
 st.title("Skarre Tracker Quantitative Portfolio Dashboard")
 
+# Sidebar: User Inputs
 st.sidebar.header("User Inputs")
 ticker = st.sidebar.text_input("Ticker Symbol", value="SPY")
 start_date = st.sidebar.date_input("Start Date", value=datetime(2010, 1, 1))
@@ -311,6 +345,7 @@ with st.spinner("Downloading data..."):
     df = compute_skarre_signal(df_raw, ma_window=ma_window, vol_window=vol_window)
     df.index = pd.to_datetime(df.index)
 
+# Organize the app into tabs.
 tabs = st.tabs(["Data & Signals", "Backtest", "Performance Metrics", "Rolling Analysis", "Optimization"])
 
 with tabs[0]:
