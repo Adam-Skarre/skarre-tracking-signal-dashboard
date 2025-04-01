@@ -7,6 +7,39 @@ from plotly.subplots import make_subplots
 from datetime import datetime
 
 # -----------------------
+# Set Page Configuration
+# -----------------------
+st.set_page_config(page_title="Skarre Tracker Quantitative Portfolio Dashboard", layout="wide")
+
+# -----------------------
+# Inject Custom CSS for Mobile Responsiveness
+# -----------------------
+st.markdown(
+    """
+    <style>
+    /* Adjust container padding on mobile devices */
+    @media only screen and (max-width: 600px) {
+        .reportview-container .main .block-container{
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        /* Adjust chart heights for mobile */
+        .plotly-graph-div {
+            height: 300px !important;
+        }
+        /* Optionally reduce font sizes */
+        .css-1d391kg, .css-18ni7ap {
+            font-size: 14px;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.title("Skarre Tracker Quantitative Portfolio Dashboard")
+
+# -----------------------
 # Data Download & Processing
 # -----------------------
 
@@ -102,7 +135,7 @@ def backtest_strategy(df, strategy="Momentum", entry_threshold=2.0, exit_thresho
         if position == 0:
             if (strategy == "Contrarian" and signal <= entry_threshold) or \
                (strategy == "Momentum" and signal >= entry_threshold):
-                # Buy signal
+                # Buy
                 shares = capital / price
                 capital_after_cost = capital * (1 - transaction_cost)
                 position = shares
@@ -319,18 +352,17 @@ def plot_signals_backtest(df, trades):
 # Main App Layout
 # -----------------------
 
-st.set_page_config(page_title="Skarre Tracker Quantitative Portfolio Dashboard", layout="wide")
 st.title("Skarre Tracker Quantitative Portfolio Dashboard")
 
 # Sidebar Inputs
 st.sidebar.header("Inputs & Parameters")
 ticker = st.sidebar.text_input("Ticker Symbol", value="SPY", help="Enter a valid ticker (e.g., SPY).")
 benchmark_ticker = st.sidebar.text_input("Benchmark (optional)", value="^GSPC", help="Optional benchmark ticker (e.g., ^GSPC).")
-start_date = st.sidebar.date_input("Start Date", value=datetime(2010, 1, 1), help="Start date for historical data.")
+start_date = st.sidebar.date_input("Start Date", value=datetime(2010,1,1), help="Start date for historical data.")
 end_date = st.sidebar.date_input("End Date", value=datetime.today(), help="End date for historical data.")
 ma_window = st.sidebar.number_input("Moving Average Window (days)", 10, 300, 150, help="Window for the moving average calculation.")
 vol_window = st.sidebar.number_input("Volatility Window (days)", 5, 60, 14, help="Window for the volatility calculation.")
-# Default strategy set to Momentum
+# Default strategy is Momentum
 strategy = st.sidebar.selectbox("Strategy Type", ["Momentum", "Contrarian"], help="Momentum: buy trending; Contrarian: buy oversold.")
 if strategy == "Contrarian":
     entry_threshold = st.sidebar.number_input("Entry Threshold (Z-score)", value=-2.0, step=0.1, help="Buy when signal is <= this value.")
@@ -451,7 +483,7 @@ with tabs[2]:
     else:
         st.write("No trades executed. Consider adjusting parameters or extending the date range (ensure 2024 data is included).")
     
-    # Reindex equity_df and buy_hold for full date range
+    # Reindex equity_df and buy_hold to cover full date range
     full_index = pd.date_range(start=df.index[0], end=df.index[-1])
     equity_df.index = pd.to_datetime(equity_df.index)
     buy_hold.index = pd.to_datetime(buy_hold.index)
@@ -553,24 +585,24 @@ with tabs[5]:
     st.header("About Skarre Tracking Signal")
     st.markdown("""
     **My Inspiration**  
-    I developed the Skarre Tracking Signal Dashboard during my college years as a personal project fueled by my passion for quantitative finance and engineering. This platform is a practical application of financial and quantitative engineering, integrating rigorous data analysis, algorithmic strategy design, and interactive visualization.
+    I created the Skarre Tracking Signal Dashboard during my college years as a personal project fueled by my passion for quantitative finance and engineering. This platform is a practical application of financial and quantitative engineering, integrating rigorous data analysis, algorithmic strategy design, and interactive visualization.
 
     **What This Dashboard Does**  
-    - **Data & Signals:** Downloads historical price data from Yahoo Finance, calculates a central moving average, and computes a proprietary Z-score signal to flag significant market conditions.  
-    - **Backtesting:** Simulates trading strategies (Momentum or Contrarian) with trailing stops, profit targets, and transaction cost adjustments, comparing the results to a Buy & Hold benchmark.  
-    - **Polynomial Analysis:** Uses rolling quadratic regression to uncover parabolic trends, offering insights into market curvature and potential turning points.  
-    - **Live Graph:** Presents real-time market data through interactive charts, including candlestick and volume displays.
-
+    - **Data & Signals:** Downloads historical price data from Yahoo Finance, computes a central moving average, and calculates a proprietary signal (a Z-score) to flag significant market conditions.
+    - **Backtesting:** Simulates trading strategies (Momentum or Contrarian) with trailing stops, profit targets, and transaction cost adjustments. Results are benchmarked against a traditional Buy & Hold approach.
+    - **Polynomial Analysis:** Utilizes rolling quadratic models to capture parabolic trends in the market, providing insights into market curvature and potential turning points.
+    - **Live Graph:** Features interactive, real-time visualizations including candlestick charts with volume and dynamic signal overlays.
+    
     **My Mission**  
-    My mission is to build a robust, professional-grade quantitative analysis platform that empowers traders and financial engineers to explore and understand market dynamics. I strive to create tools that are both rigorous in their analysis and practical in their application.
+    My goal is to build a robust, professional-grade quantitative analysis platform that empowers traders and financial engineers to explore market dynamics and refine their trading strategies. I strive to merge the precision of engineering with the insight of financial analysis to create tools that are both practical and innovative.
 
     **Future Enhancements**  
-    Planned improvements include incorporating advanced risk metrics (such as the Calmar and Omega Ratios), real-time alerts, multi-asset analysis, and enhanced export options to further refine this platform.
+    Planned improvements include advanced risk metrics (such as the Calmar and Omega Ratios), real-time alerts, multi-asset analysis, and export options for further in-depth research.
 
     **Disclaimer**  
-    This dashboard is a rigorously engineered research tool based on historical data and quantitative analysis. While no strategy can guarantee future performance, the methodologies implemented are grounded in robust engineering principles and provide valuable insights into market behavior.
+    This dashboard is a rigorously engineered research tool based on historical data and quantitative analysis. While no strategy can guarantee future performance, the methodologies implemented are founded on solid engineering principles and provide valuable insights into market behavior.
 
     **Thank You**  
-    Thank you for exploring the Skarre Tracking Signal Dashboard. Your feedback is essential as I continue to refine and enhance this project.
+    Thank you for exploring my Skarre Tracking Signal Dashboard. Your feedback is invaluable as I continue to refine and enhance this project.
     """)
     st.write("Thank you for exploring my dashboard!")
