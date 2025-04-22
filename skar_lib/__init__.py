@@ -1,14 +1,7 @@
 # skar_lib/__init__.py
 
 from .data_loader import download_price_data, load_cached_data
-from .polynomial_fit import (
-    smooth_price,
-    get_slope,
-    get_acceleration,
-    fit_polynomial,
-    eval_polynomial,
-    get_polynomial_features,
-)
+from .polynomial_fit import smooth_price, get_slope, get_acceleration, fit_polynomial, eval_polynomial, get_polynomial_features
 from .signal_logic import generate_signals
 from .backtester import backtest, generate_trade_log
 from .optimizer import optimize_thresholds, get_optimal_thresholds
