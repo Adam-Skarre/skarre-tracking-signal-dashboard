@@ -39,15 +39,16 @@ def smooth_price(price_series: pd.Series, window: int = 21, order: int = 2) -> p
             polyorder=order,
             mode='mirror'
         )
+        return pd.Series(smoothed, index=price_series.index)
     except Exception:
-        smoothed = values
-    return pd.Series(smoothed, index=price_series.index)
+        return price_series.copy()
+(smoothed, index=price_series.index)
 
 
 def get_slope(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
     Compute the first derivative (slope) of the price series.
-    Uses Savitzky–Golay filter with mirror padding. Falls back to numpy gradient if filter fails.
+    Uses Savitzky–Golay filter with mirror padding. Falls back to numpy gradient on error.
     Returns a pandas Series.
     """
     values = price_series.values
@@ -63,14 +64,19 @@ def get_slope(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.S
         )
     except Exception:
         slope = np.gradient(values)
-    return pd.Series(slope, index=price_series.index)
+    # Attempt to align with index, fallback to gradient series if mismatch
+    try:
+        return pd.Series(slope, index=price_series.index)
+    except Exception:
+        slope2 = np.gradient(values)
+        return pd.Series(slope2, index=price_series.index)
+(slope, index=price_series.index)
 
 
 def get_acceleration(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
     Compute the second derivative (acceleration) of the price series.
-    Uses Savitzky–Golay filter with mirror padding. Falls back to \
-numpy second-order gradient if filter fails.
+    Uses Savitzky–Golay filter with mirror padding. Falls back to numpy gradient if filter or alignment fails.
     Returns a pandas Series.
     """
     values = price_series.values
@@ -85,9 +91,14 @@ numpy second-order gradient if filter fails.
             mode='mirror'
         )
     except Exception:
-        # fallback: second derivative via numpy gradient twice
         accel = np.gradient(np.gradient(values))
-    return pd.Series(accel, index=price_series.index)
+    # Attempt to align with index, fallback gradient series if mismatch
+    try:
+        return pd.Series(accel, index=price_series.index)
+    except Exception:
+        accel2 = np.gradient(np.gradient(values))
+        return pd.Series(accel2, index=price_series.index)
+(accel, index=price_series.index)
 
 
 def fit_polynomial(x_vals, y_vals, degree: int = 2):
