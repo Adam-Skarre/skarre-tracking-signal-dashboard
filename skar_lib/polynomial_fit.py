@@ -25,26 +25,24 @@ def smooth_price(price_series: pd.Series, window: int = 21, order: int = 2) -> p
 def get_slope(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     arr = price_series.values
     w = _adjust_window(len(arr), window, order)
+
     try:
-        if len(arr) < 2 or np.allclose(arr, arr[0]):
-            return pd.Series(np.zeros_like(arr), index=price_series.index)
         sl = savgol_filter(arr, window_length=w, polyorder=order, deriv=1, mode='mirror')
-        return pd.Series(sl, index=price_series.index)
     except Exception:
-        grad = np.gradient(arr) if len(arr) >= 2 else np.zeros_like(arr)
-        return pd.Series(grad, index=price_series.index)
+        sl = np.gradient(arr) if len(arr) >= 2 else np.zeros_like(arr)
+
+    return pd.Series(sl, index=price_series.index)
 
 def get_acceleration(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     arr = price_series.values
     w = _adjust_window(len(arr), window, order)
+
     try:
-        if len(arr) < 3 or np.allclose(arr, arr[0]):
-            return pd.Series(np.zeros_like(arr), index=price_series.index)
         ac = savgol_filter(arr, window_length=w, polyorder=order, deriv=2, mode='mirror')
-        return pd.Series(ac, index=price_series.index)
     except Exception:
-        grad2 = np.gradient(np.gradient(arr)) if len(arr) >= 3 else np.zeros_like(arr)
-        return pd.Series(grad2, index=price_series.index)
+        ac = np.gradient(np.gradient(arr)) if len(arr) >= 3 else np.zeros_like(arr)
+
+    return pd.Series(ac, index=price_series.index)
 
 def fit_polynomial(x_vals: np.ndarray, y_vals: np.ndarray, degree: int = 2) -> np.ndarray:
     return np.polyfit(x_vals, y_vals, degree)
