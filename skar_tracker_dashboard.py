@@ -1,117 +1,89 @@
-import streamlit as st
+import numpy as np
 import pandas as pd
+from scipy.signal import savgol_filter
 
-# --- Import your library modules ---
-from skar_lib.data_loader      import download_price_data
-from skar_lib.polynomial_fit   import get_slope, get_acceleration
-from skar_lib.signal_logic     import generate_signals
-from skar_lib.optimizer        import optimize_thresholds, get_optimal_thresholds
-from skar_lib.backtester       import backtest
-from skar_lib.plots            import (
-    plot_equity_curve,
-    plot_drawdown,
-    plot_signals,
-    plot_heatmap,
-)
+def _adjust_window(series_length: int, window: int, order: int) -> int:
+    if window > series_length:
+        window = series_length
+    if window <= order:
+        window = order + 1
+    if window % 2 == 0:
+        window -= 1
+    if window < 3:
+        window = 3
+    return window
 
-# --- Sidebar Navigation ---
-st.sidebar.title("Navigation")
-page = st.sidebar.radio(
-    "Go to",
-    ["About", "Performance", "Optimization", "Diagnostics", "Trade Log"],
-    index=0  # About is default
-)
+def smooth_price(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
+    arr = price_series.values
+    w = _adjust_window(len(arr), window, order)
+    try:
+        sm = savgol_filter(arr, window_length=w, polyorder=order, mode='mirror')
+        return pd.Series(sm, index=price_series.index)
+    except Exception:
+        return price_series.copy()
 
-# --- Load & Cache Data ---
-@st.cache_data
-def load_price():
-    df = download_price_data(['SPY', 'QQQ'], '2020-01-01', '2025-04-20')
-    return df['SPY'], df['QQQ']
+def get_slope(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
+    arr = price_series.values
+    w = _adjust_window(len(arr), window, order)
 
-price_spy, price_qqq = load_price()
+    try:
+        if len(arr) < 3 or not np.isfinite(arr).all():
+            raise ValueError("Input too short or contains non-finite values")
+        sl = savgol_filter(arr, window_length=w, polyorder=order, deriv=1, mode='mirror')
+        return pd.Series(sl, index=price_series.index)
+    except Exception:
+        try:
+            arr_clean = arr.flatten() if arr.ndim > 1 else arr
+            if len(arr_clean) < 2 or not np.isfinite(arr_clean).all():
+                grad = np.zeros_like(arr_clean)
+            else:
+                grad = np.gradient(arr_clean)
+        except Exception:
+            grad = np.zeros_like(arr)
+        return pd.Series(grad, index=price_series.index)
 
-# Compute derivatives for SPY
-slope_spy = get_slope(price_spy)
-accel_spy = get_acceleration(price_spy)
+def get_acceleration(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
+    arr = price_series.values
+    w = _adjust_window(len(arr), window, order)
 
-# --- About Page ---
-if page == "About":
-    st.title("About the Skarre Signal Dashboard")
-    st.markdown("""
-The Skarre Signal Dashboard is an engineering‑driven, data‑science approach to algorithmic trading,
-inspired by the research rigor of Renaissance Technologies. We use **polynomial regression** and
-**calculus‑based derivatives** to anticipate market turns, optimize entry/exit thresholds, and
-benchmark against passive indices.
+    try:
+        if len(arr) < 5 or not np.isfinite(arr).all():
+            raise ValueError("Input too short or contains non-finite values")
+        ac = savgol_filter(arr, window_length=w, polyorder=order, deriv=2, mode='mirror')
+        return pd.Series(ac, index=price_series.index)
+    except Exception:
+        try:
+            arr_clean = arr.flatten() if arr.ndim > 1 else arr
+            if len(arr_clean) < 3 or not np.isfinite(arr_clean).all():
+                grad2 = np.zeros_like(arr_clean)
+            else:
+                grad2 = np.gradient(np.gradient(arr_clean))
+        except Exception:
+            grad2 = np.zeros_like(arr)
+        return pd.Series(grad2, index=price_series.index)
 
-**Key Metrics (SPY backtest)**:
-- Annualized Return: 14.2% vs 9.1% (SPY)
-- Sharpe Ratio: 1.15 vs 0.75
-- Max Drawdown: –12% vs –32%
-- Win Rate: 59%
-- Trades/Year: ~22
+def fit_polynomial(x_vals: np.ndarray, y_vals: np.ndarray, degree: int = 2) -> np.ndarray:
+    return np.polyfit(x_vals, y_vals, degree)
 
-This dashboard is modular and fully transparent—every step can be backtested, optimized, and visualized.
-    """)
+def eval_polynomial(coeffs: np.ndarray, x_vals: np.ndarray) -> np.ndarray:
+    poly = np.poly1d(coeffs)
+    return poly(x_vals)
 
-# --- Performance Page ---
-elif page == "Performance":
-    st.title("Strategy Performance vs. SPY")
-    entry_th, exit_th = 0.5, -0.5
-    positions = generate_signals(slope_spy, accel_spy, entry_th, exit_th, use_acceleration=True)
-    result = backtest(price_spy, positions)
-
-    st.subheader("Equity Curve")
-    st.pyplot(plot_equity_curve(result['equity_curve']))
-
-    st.subheader("Drawdown")
-    st.pyplot(plot_drawdown(result['equity_curve']))
-
-    st.subheader("Performance Metrics")
-    perf = result['performance']
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Sharpe Ratio", f"{perf['Sharpe']:.2f}")
-    col2.metric("Max Drawdown", f"{perf['Max Drawdown']:.0%}")
-    col3.metric("Win Rate", f"{perf['Win Rate']:.0%}")
-    col4.metric("Trades/Year", f"{perf['Trade Frequency']:.1f}")
-
-# --- Optimization Page ---
-elif page == "Optimization":
-    st.title("Threshold Optimization")
-    st.markdown("Grid‑search over entry/exit slope thresholds to maximize Sharpe Ratio.")
-    results = optimize_thresholds(
-        price_series=price_spy,
-        slope_series=slope_spy,
-        accel_series=accel_spy,
-        entry_min=0.0, entry_max=1.0,
-        exit_min=-1.0, exit_max=0.0,
-        step=0.1,
-        use_acceleration=True,
-        metric='Sharpe'
+def get_polynomial_features(price_series: pd.Series, window: int = 21, degree: int = 2):
+    length = len(price_series)
+    if length < window:
+        raise ValueError("Series length must exceed the window size")
+    x = np.arange(window)
+    dates, a_vals, b_vals, c_vals = [], [], [], []
+    for i in range(window, length + 1):
+        y = price_series.iloc[i-window:i].values
+        coeffs = np.polyfit(x, y, degree)
+        a_vals.append(coeffs[0])
+        b_vals.append(coeffs[1])
+        c_vals.append(coeffs[2] if degree == 2 else 0)
+        dates.append(price_series.index[i-1])
+    return (
+        pd.Series(a_vals, index=dates),
+        pd.Series(b_vals, index=dates),
+        pd.Series(c_vals, index=dates),
     )
-    best_entry, best_exit = get_optimal_thresholds(results)
-
-    st.write(f"**Optimal Entry:** {best_entry:.2f} **Optimal Exit:** {best_exit:.2f}")
-    st.pyplot(plot_heatmap(results,
-                           xlabel='Exit Slope',
-                           ylabel='Entry Slope',
-                           title='Sharpe Heatmap'))
-
-# --- Diagnostics Page ---
-elif page == "Diagnostics":
-    st.title("Derivative Diagnostics")
-    st.markdown("Visualize price and slope/acceleration signals.")
-    st.pyplot(plot_signals(price_spy, generate_signals(slope_spy, accel_spy, 0.0, 0.0)))
-
-    st.subheader("Slope (1st Derivative)")
-    st.line_chart(pd.DataFrame({'Slope': slope_spy}))
-
-    st.subheader("Acceleration (2nd Derivative)")
-    st.line_chart(pd.DataFrame({'Acceleration': accel_spy}))
-
-# --- Trade Log Page ---
-elif page == "Trade Log":
-    st.title("Trade Log")
-    # Re‑run with optimal thresholds for log
-    signals = generate_signals(slope_spy, accel_spy, best_entry, best_exit, use_acceleration=True)
-    trade_df = backtest(price_spy, signals)['trade_log']
-    st.dataframe(trade_df)
