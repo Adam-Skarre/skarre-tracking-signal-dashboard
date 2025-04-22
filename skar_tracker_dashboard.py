@@ -166,23 +166,47 @@ elif page == "Polynomial Fit Curve":
 # DERIVATIVE HISTOGRAMS
 elif page == "Derivative Histograms":
     st.title("Slope and Acceleration Histograms")
+
+    # Load price and compute derivatives
     price_hist = get_data("SPY", "2022-01-01", "2024-12-31")["Price"]
     slope_hist = get_slope(price_hist)
     accel_hist = get_acceleration(price_hist)
 
-    st.subheader("Slope Distribution")
-    st.bar_chart(slope_hist.value_counts(bins=30).sort_index())
+    # Format bins as clean midpoints
+    def format_histogram(series, bins=30):
+        counts, bin_edges = np.histogram(series.dropna(), bins=bins)
+        midpoints = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+        return pd.Series(counts, index=[f"{x:.2f}" for x in midpoints])
 
+    # Slope
+    st.subheader("Slope Distribution")
+    slope_bins = format_histogram(slope_hist)
+    st.bar_chart(slope_bins)
+
+    # Acceleration
     st.subheader("Acceleration Distribution")
-    st.bar_chart(accel_hist.value_counts(bins=30).sort_index())
+    accel_bins = format_histogram(accel_hist)
+    st.bar_chart(accel_bins)
+
+    st.markdown("""
+    These histograms visualize the frequency of slope and acceleration values from SPY's price data.
+
+    - **Slope (1st derivative)** reflects the **rate of change in price** — essentially the momentum.
+    - **Acceleration (2nd derivative)** measures how that momentum itself is changing — identifying curvature or regime shifts.
+
+    By analyzing these distributions, you can identify which values are common, rare, or extreme — useful for setting effective signal thresholds.
+    """)
 
 # THRESHOLD OPTIMIZATION
 elif page == "Threshold Optimization":
     st.title("Threshold Optimization Heatmap")
+
+    # Data and derivatives
     price_opt = get_data("SPY", "2022-01-01", "2024-12-31")["Price"]
     slope_opt = get_slope(price_opt)
     accel_opt = get_acceleration(price_opt)
 
+    # Threshold grid
     entry_range = np.arange(0.0, 1.1, 0.1)
     exit_range = np.arange(-1.0, 0.1, 0.1)
     heatmap = []
@@ -195,9 +219,27 @@ elif page == "Threshold Optimization":
             row.append(result["performance"]["Sharpe"])
         heatmap.append(row)
 
-    heatmap_df = pd.DataFrame(heatmap, index=[f"{e:.1f}" for e in entry_range], columns=[f"{x:.1f}" for x in exit_range])
+    heatmap_df = pd.DataFrame(
+        heatmap, 
+        index=[f"{e:.1f}" for e in entry_range], 
+        columns=[f"{x:.1f}" for x in exit_range]
+    )
+
+    # Render heatmap
     st.subheader("Sharpe Ratio Heatmap (Entry vs Exit Threshold)")
     st.dataframe(heatmap_df.style.background_gradient(cmap="RdYlGn", axis=None))
+
+    st.markdown("""
+    The heatmap displays the **Sharpe Ratio** — a risk-adjusted return metric — for each pair of entry and exit thresholds.
+
+    - **Entry Threshold** (Y-axis): Minimum slope to enter a trade — higher values mean stronger upward momentum is required.
+    - **Exit Threshold** (X-axis): Maximum (negative) slope to trigger an exit — lower values exit trades earlier on downward shifts.
+
+    **How to read this:**
+    - Green cells = better Sharpe ratios → stronger risk-adjusted performance
+    - Red cells = underperforming combinations
+    - Look for consistent green zones to identify optimal threshold regions for your strategy
+    """)
 
 # STRATEGY PERFORMANCE
 elif page == "Strategy Performance":
