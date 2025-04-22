@@ -2,10 +2,9 @@ from scipy.signal import savgol_filter
 import numpy as np
 import pandas as pd
 
-
 def _adjust_window(series_length: int, window: int, order: int) -> int:
     """
-    Ensure the Savitzky-Golay window length is valid:
+    Ensure Savitzky–Golay window_length is valid:
       - window_length <= series_length
       - window_length > polyorder
       - window_length is odd
@@ -22,39 +21,52 @@ def _adjust_window(series_length: int, window: int, order: int) -> int:
         window -= 1
     return max(3, window)
 
-
 def smooth_price(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
-    Smooth price series using Savitzky-Golay filter.
+    Smooth price series using Savitzky–Golay filter (mirror padding).
     Returns a pandas Series matching the original index.
     """
     length = len(price_series)
     w = _adjust_window(length, window, order)
-    smoothed = savgol_filter(price_series.values, window_length=w, polyorder=order)
+    smoothed = savgol_filter(
+        price_series.values,
+        window_length=w,
+        polyorder=order,
+        mode='mirror'
+    )
     return pd.Series(smoothed, index=price_series.index)
-
 
 def get_slope(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
     Compute the first derivative (slope) of the price series.
-    Uses Savitzky-Golay filter. Returns a pandas Series.
+    Uses Savitzky–Golay filter with mirror padding. Returns a pandas Series.
     """
     length = len(price_series)
     w = _adjust_window(length, window, order)
-    slope = savgol_filter(price_series.values, window_length=w, polyorder=order, deriv=1)
+    slope = savgol_filter(
+        price_series.values,
+        window_length=w,
+        polyorder=order,
+        deriv=1,
+        mode='mirror'
+    )
     return pd.Series(slope, index=price_series.index)
-
 
 def get_acceleration(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
     Compute the second derivative (acceleration) of the price series.
-    Uses Savitzky-Golay filter. Returns a pandas Series.
+    Uses Savitzky–Golay filter with mirror padding. Returns a pandas Series.
     """
     length = len(price_series)
     w = _adjust_window(length, window, order)
-    accel = savgol_filter(price_series.values, window_length=w, polyorder=order, deriv=2)
+    accel = savgol_filter(
+        price_series.values,
+        window_length=w,
+        polyorder=order,
+        deriv=2,
+        mode='mirror'
+    )
     return pd.Series(accel, index=price_series.index)
-
 
 def fit_polynomial(x_vals, y_vals, degree: int = 2):
     """
@@ -63,14 +75,12 @@ def fit_polynomial(x_vals, y_vals, degree: int = 2):
     """
     return np.polyfit(x_vals, y_vals, degree)
 
-
 def eval_polynomial(coeffs, x_vals):
     """
     Evaluate polynomial with given coeffs over x_vals.
     """
     poly = np.poly1d(coeffs)
     return poly(x_vals)
-
 
 def get_polynomial_features(price_series: pd.Series, window: int = 21, degree: int = 2):
     """
@@ -86,7 +96,7 @@ def get_polynomial_features(price_series: pd.Series, window: int = 21, degree: i
     dates = []
 
     for i in range(window, length + 1):
-        y = price_series.values[i - window:i]
+        y = price_series.values[i - window : i]
         coeffs = np.polyfit(x, y, degree)
         a_vals.append(coeffs[0])
         b_vals.append(coeffs[1])
