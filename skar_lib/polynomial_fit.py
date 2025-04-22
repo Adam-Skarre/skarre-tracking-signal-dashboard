@@ -1,57 +1,100 @@
 from scipy.signal import savgol_filter
 import numpy as np
+import pandas as pd
 
 
-def smooth_price(price_series, window=21, order=2):
+def _adjust_window(series_length: int, window: int, order: int) -> int:
     """
-    Apply Savitzky–Golay filter to smooth price series.
+    Ensure the Savitzky-Golay window length is valid:
+      - window_length <= series_length
+      - window_length > polyorder
+      - window_length is odd
     """
-    return savgol_filter(price_series, window_length=window, polyorder=order)
+    # Cap window at series length (make odd)
+    if window > series_length:
+        window = series_length if series_length % 2 == 1 else series_length - 1
+    # Minimum window must exceed polynomial order
+    min_win = order + 2
+    if window <= order:
+        window = min_win if min_win % 2 == 1 else min_win + 1
+    # Ensure odd
+    if window % 2 == 0:
+        window -= 1
+    return max(3, window)
 
 
-def get_slope(price_series, window=21, order=2):
+def smooth_price(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
-    Compute the first derivative (slope) of the smoothed price series.
+    Smooth price series using Savitzky-Golay filter.
+    Returns a pandas Series matching the original index.
     """
-    return savgol_filter(price_series, window_length=window, polyorder=order, deriv=1)
+    length = len(price_series)
+    w = _adjust_window(length, window, order)
+    smoothed = savgol_filter(price_series.values, window_length=w, polyorder=order)
+    return pd.Series(smoothed, index=price_series.index)
 
 
-def get_acceleration(price_series, window=21, order=2):
+def get_slope(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
-    Compute the second derivative (acceleration) of the smoothed price series.
+    Compute the first derivative (slope) of the price series.
+    Uses Savitzky-Golay filter. Returns a pandas Series.
     """
-    return savgol_filter(price_series, window_length=window, polyorder=order, deriv=2)
+    length = len(price_series)
+    w = _adjust_window(length, window, order)
+    slope = savgol_filter(price_series.values, window_length=w, polyorder=order, deriv=1)
+    return pd.Series(slope, index=price_series.index)
 
 
-def fit_polynomial(x_vals, y_vals, degree=2):
+def get_acceleration(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
-    Fit a polynomial of specified degree to the data and return coefficients.
+    Compute the second derivative (acceleration) of the price series.
+    Uses Savitzky-Golay filter. Returns a pandas Series.
+    """
+    length = len(price_series)
+    w = _adjust_window(length, window, order)
+    accel = savgol_filter(price_series.values, window_length=w, polyorder=order, deriv=2)
+    return pd.Series(accel, index=price_series.index)
+
+
+def fit_polynomial(x_vals, y_vals, degree: int = 2):
+    """
+    Fit a polynomial of specified degree to x_vals and y_vals.
+    Returns numpy array of coefficients.
     """
     return np.polyfit(x_vals, y_vals, degree)
 
 
 def eval_polynomial(coeffs, x_vals):
     """
-    Evaluate a polynomial at the given x values.
+    Evaluate polynomial with given coeffs over x_vals.
     """
     poly = np.poly1d(coeffs)
     return poly(x_vals)
 
 
-def get_polynomial_features(price_series, window=21, degree=2):
+def get_polynomial_features(price_series: pd.Series, window: int = 21, degree: int = 2):
     """
-    Fit polynomial over a rolling window and return time series of coefficients.
-    Returns three arrays: a_coeffs, b_coeffs, c_coeffs for quadratic fits.
+    Compute rolling polynomial coefficients for the price series.
+    Returns three pandas Series for coefficients (a, b, c).
     """
-    a_coeffs, b_coeffs, c_coeffs = [], [], []
+    length = len(price_series)
+    if length < window:
+        raise ValueError("Series length must exceed window for polynomial features")
+
     x = np.arange(window)
+    a_vals, b_vals, c_vals = [], [], []
+    dates = []
 
-    for i in range(window, len(price_series)):
-        y_window = price_series[i - window : i]
-        coeffs = np.polyfit(x, y_window, degree)
-        a_coeffs.append(coeffs[0])
-        b_coeffs.append(coeffs[1])
-        c_coeffs.append(coeffs[2] if degree == 2 else 0)
+    for i in range(window, length + 1):
+        y = price_series.values[i - window:i]
+        coeffs = np.polyfit(x, y, degree)
+        a_vals.append(coeffs[0])
+        b_vals.append(coeffs[1])
+        c_vals.append(coeffs[2] if degree == 2 else 0)
+        dates.append(price_series.index[i - 1])
 
-    return np.array(a_coeffs), np.array(b_coeffs), np.array(c_coeffs)
-
+    return (
+        pd.Series(a_vals, index=dates),
+        pd.Series(b_vals, index=dates),
+        pd.Series(c_vals, index=dates),
+    )
