@@ -1,85 +1,58 @@
 import pandas as pd
 import numpy as np
-from .metrics import sharpe_ratio, max_drawdown, win_rate, trade_frequency
 
-def generate_trade_log(price_series: pd.Series, positions: pd.Series) -> pd.DataFrame:
+def backtest(price_series, positions):
     """
-    Generate a log of trades from position signals.
-
-    Parameters:
-    - price_series: pd.Series of prices indexed by date
-    - positions: pd.Series of position signals (1 for long, 0 for flat)
-
-    Returns:
-    - DataFrame with Entry Date, Exit Date, Entry Price, Exit Price, and Return columns
+    Basic backtesting engine:
+    - Calculates equity curve from positions
+    - Tracks trades and returns a trade log
     """
-    trades = []
+
+    df = pd.DataFrame({'Price': price_series, 'Position': positions}).copy()
+    df['Return'] = df['Price'].pct_change().fillna(0)
+    df['Strategy Return'] = df['Return'] * df['Position'].shift().fillna(0)
+
+    # Calculate equity curve
+    df['Equity'] = (1 + df['Strategy Return']).cumprod()
+
+    # Build trade log
+    trade_log = []
+    in_position = False
     entry_date = None
-    prev_positions = positions.shift(1).fillna(0)
+    entry_price = None
 
-    for date in positions.index:
-        prev = prev_positions.loc[date]
-        pos = positions.loc[date]
+    for date, row in df.iterrows():
+        pos = row['Position']
+        price = row['Price']
 
-        # Entry: flat -> long
-        if prev == 0 and pos == 1:
+        if pos != 0 and not in_position:
+            in_position = True
             entry_date = date
-
-        # Exit: long -> flat
-        elif prev == 1 and pos == 0 and entry_date is not None:
+            entry_price = price
+        elif pos == 0 and in_position:
             exit_date = date
-            entry_price = price_series.loc[entry_date]
-            exit_price = price_series.loc[exit_date]
-            ret = exit_price / entry_price - 1
-            trades.append({
+            exit_price = price
+            trade_log.append({
                 'Entry Date': entry_date,
                 'Exit Date': exit_date,
                 'Entry Price': entry_price,
                 'Exit Price': exit_price,
-                'Return': ret
+                'Return': (exit_price - entry_price) / entry_price
             })
-            entry_date = None
+            in_position = False
 
-    return pd.DataFrame(trades)
+    trade_df = pd.DataFrame(trade_log)
 
-
-def backtest(
-    price_series: pd.Series,
-    positions: pd.Series,
-    initial_capital: float = 100.0
-) -> dict:
-    """
-    Run a backtest given price series and position signals.
-
-    Returns a dict with:
-      - equity_curve: pd.Series of portfolio value over time
-      - strategy_returns: pd.Series of periodic returns
-      - trade_log: DataFrame of individual trades
-      - performance: dict of performance metrics
-    """
-    # Compute daily returns
-    returns = price_series.pct_change().fillna(0)
-    # Apply positions (shifted by 1 to avoid lookahead)
-    strategy_returns = positions.shift(1).fillna(0) * returns
-
-    # Build equity curve
-    equity_curve = initial_capital * (1 + strategy_returns).cumprod()
-
-    # Extract trade log
-    trade_log = generate_trade_log(price_series, positions)
-
-    # Calculate metrics
+    # Performance metrics
     perf = {
-        'Sharpe': sharpe_ratio(strategy_returns),
-        'Max Drawdown': max_drawdown(equity_curve),
-        'Win Rate': win_rate(trade_log['Return'] if not trade_log.empty else []),
-        'Trade Frequency': trade_frequency(trade_log['Entry Date'],
-                                           (price_series.index[-1] - price_series.index[0]).days)
+        'Sharpe': df['Strategy Return'].mean() / df['Strategy Return'].std() * np.sqrt(252) if df['Strategy Return'].std() else 0,
+        'Max Drawdown': (df['Equity'] / df['Equity'].cummax() - 1).min(),
+        'Win Rate': (trade_df['Return'] > 0).mean() if not trade_df.empty else 0,
+        'Trade Frequency': len(trade_df) / ((df.index[-1] - df.index[0]).days / 365)
     }
 
     return {
-        'equity_curve': equity_curve,
-        'strategy_returns': strategy_returns,
-        'trade_log': trade_log,
-        'performance': perf
+        'performance': perf,
+        'equity_curve': df['Equity'],
+        'trade_log': trade_df
     }
