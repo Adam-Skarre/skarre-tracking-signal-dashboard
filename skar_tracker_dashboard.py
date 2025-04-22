@@ -78,53 +78,84 @@ if page == "Live Signal Tracker":
 
 # ABOUT
 elif page == "About":
-    st.title("About the Skarre Signal Dashboard")
+    st.title("Engineering, Optimization, and Comparison of Algorithmic Trading")
 
     st.markdown("""
-    The Skarre Signal Dashboard represents a convergence of engineering, data science, and quantitative finance. It was developed as part of a larger initiative to build a strategy that uses mathematical structure—not speculation—to navigate financial markets.
+    This dashboard is the core deliverable of an independent research project titled **“Engineering, Optimization, and Comparison of Algorithmic Trading.”**  
+    The project investigates whether structured, engineering-based techniques can be used to design, analyze, and optimize algorithmic trading strategies that outperform passive benchmarks.
 
-    ### Project Background
+    ### Research Objectives
 
-    This strategy was born out of a deep interest in **algorithmic trading**, with a goal to move beyond traditional indicators and price-based heuristics. Instead, the approach focuses on extracting **actionable structure** from market data through **polynomial regression** and **calculus-based analysis**.
-
-    Inspired by research-oriented firms such as **Renaissance Technologies**, the project emphasizes:
-    - Data-driven decision making
-    - Statistical robustness over intuition
-    - Continuous model evaluation and refinement
-    - Empirical benchmarking against market baselines
+    The primary goals of the study are to:
+    - Apply mathematical modeling and calculus to extract actionable structure from market data
+    - Develop a signal generation system using first and second derivatives of price curves
+    - Optimize entry/exit thresholds for improved performance across various regimes
+    - Compare strategy behavior to passive investing (e.g. SPY, QQQ) through backtesting
+    - Present findings in a transparent, interactive format
 
     ### Methodology Overview
 
-    The Skarre Signal fits polynomial curves to price data and uses **first and second derivatives**—slope and curvature—as signals of trend velocity and regime change. Rather than reacting to lagging indicators, it anticipates market turns based on changes in momentum and acceleration, much like the predictive modeling frameworks used in advanced engineering systems.
+    The system:
+    - Uses **Savitzky–Golay filters** to smooth price data while preserving critical turning points
+    - Computes **first and second derivatives** (slope and curvature) to detect acceleration-based signals
+    - Applies **threshold logic** to identify long/exit conditions based on derivative magnitudes and direction
+    - Performs backtests with full metrics including Sharpe ratio, drawdown, win rate, and ROI
+    - Benchmarks strategy output against SPY buy-and-hold to evaluate relative performance
 
-    The system features:
-    - Polynomial smoothing using Savitzky-Golay filters
-    - Derivative analysis to time entries and exits
-    - Hyperparameter optimization via threshold sweeps
-    - Robust backtesting with metrics including Sharpe ratio, drawdown, ROI, and trade frequency
-    - Comparative benchmarking against SPY and QQQ to evaluate outperformance
+    ### System Features
 
-    ### Key Performance Metrics
+    This dashboard allows users to:
+    - Select tickers and explore real-time signal overlays
+    - Visualize moving slopes and curvature-based inflection zones
+    - Run parameter sweeps and generate heatmaps for optimization
+    - Compare strategy returns against traditional market exposure
+    - Download trade logs and inspect signal performance over time
 
-    In preliminary evaluations, the Skarre Signal produced the following results:
+    ### Live Performance Results (SPY: 2020–2024)
 
-    | Metric              | Skarre Signal | SPY (Buy & Hold) |
-    |---------------------|---------------|------------------|
-    | Annualized Return   | 14.2%         | 9.1%             |
-    | Sharpe Ratio        | 1.15          | 0.75             |
-    | Max Drawdown        | -12%          | -32%             |
-    | Win Rate            | 59%           | N/A              |
-    | Trades per Year     | ~22           | 1                |
+    The results below are dynamically generated using the strategy's current thresholds:
+    """)
 
-    These results suggest that with properly tuned parameters and real-time responsiveness to market dynamics, model-based trading systems can outperform passive strategies in both absolute and risk-adjusted terms.
+    # Live backtest result for SPY (2020–2024)
+    price = get_data("SPY", "2020-01-01", "2024-12-31")["Price"]
+    slope = get_slope(price)
+    accel = get_acceleration(price)
+    signals = generate_signals(slope, accel, 0.5, -0.5, use_acceleration=True)
+    result = backtest(price, signals)
+
+    buy_hold = (1 + price.pct_change().fillna(0)).cumprod()
+    buy_hold_drawdown = (buy_hold / buy_hold.cummax() - 1).min()
+
+    comparison_df = pd.DataFrame({
+        "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
+        "Skarre Signal": [
+            f"{(result['equity_curve'].iloc[-1] - 1) * 100:.1f}%",
+            f"{result['performance']['Sharpe']:.2f}",
+            f"{result['performance']['Max Drawdown'] * 100:.0f}%",
+            f"{result['performance']['Win Rate'] * 100:.0f}%",
+            f"{result['performance']['Trade Frequency']:.1f}"
+        ],
+        "SPY (Buy & Hold)": [
+            f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
+            "N/A",
+            f"{buy_hold_drawdown * 100:.0f}%",
+            "N/A",
+            "1"
+        ]
+    }).set_index("Metric")
+
+    with st.expander("View Live Performance Table"):
+        st.dataframe(comparison_df)
+
+    st.markdown("""
+    *Note: These values are computed using fixed thresholds (entry = 0.5, exit = –0.5) over the 2020–2024 period, and are subject to change based on market conditions.*
 
     ### Conclusion
 
-    The Skarre Signal Dashboard is not a finished product—it's an evolving research tool built with transparency and repeatability in mind. The methodology behind it is designed to be tested, optimized, and stress-tested further. The vision is aligned with a simple but powerful question:
+    This dashboard reflects a structured, engineering-first approach to market modeling.  
+    It was developed as part of the academic study **“Engineering, Optimization, and Comparison of Algorithmic Trading,”** which blends principles from mechanical systems analysis, data science, and quantitative finance. 
 
-    **Can engineering principles and data science systematically outperform intuition in financial markets?**
-
-    This dashboard is an early step in answering that question—built with care, tested with data, and continuously improved based on results.
+    The Skarre Signal is not intended as financial advice or a final product. Instead, it is an evolving model and presentation tool — built to explore whether mathematical rigor and optimization can consistently outperform intuition in dynamic financial systems.
     """)
 # DERIVATIVE DIAGNOSTICS
 elif page == "Derivative Diagnostics":
