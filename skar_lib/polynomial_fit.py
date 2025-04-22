@@ -22,29 +22,43 @@ def _adjust_window(series_length: int, window: int, order: int) -> int:
 def smooth_price(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
     Smooth the price series using a Savitzky–Golay filter.
+    Falls back to raw series if anything goes wrong.
     """
     arr = price_series.values
     w = _adjust_window(len(arr), window, order)
-    sm = savgol_filter(arr, window_length=w, polyorder=order, mode='mirror')
-    return pd.Series(sm, index=price_series.index)
+    try:
+        sm = savgol_filter(arr, window_length=w, polyorder=order, mode='mirror')
+        return pd.Series(sm, index=price_series.index)
+    except Exception:
+        return price_series.copy()
 
 def get_slope(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
     Compute the first derivative (slope) via Savitzky–Golay.
+    Falls back to numpy.gradient on failure.
     """
     arr = price_series.values
     w = _adjust_window(len(arr), window, order)
-    sl = savgol_filter(arr, window_length=w, polyorder=order, deriv=1, mode='mirror')
-    return pd.Series(sl, index=price_series.index)
+    try:
+        sl = savgol_filter(arr, window_length=w, polyorder=order, deriv=1, mode='mirror')
+        return pd.Series(sl, index=price_series.index)
+    except Exception:
+        grad = np.gradient(arr)
+        return pd.Series(grad, index=price_series.index)
 
 def get_acceleration(price_series: pd.Series, window: int = 21, order: int = 2) -> pd.Series:
     """
     Compute the second derivative (acceleration) via Savitzky–Golay.
+    Falls back to double numpy.gradient on failure.
     """
     arr = price_series.values
     w = _adjust_window(len(arr), window, order)
-    ac = savgol_filter(arr, window_length=w, polyorder=order, deriv=2, mode='mirror')
-    return pd.Series(ac, index=price_series.index)
+    try:
+        ac = savgol_filter(arr, window_length=w, polyorder=order, deriv=2, mode='mirror')
+        return pd.Series(ac, index=price_series.index)
+    except Exception:
+        grad2 = np.gradient(np.gradient(arr))
+        return pd.Series(grad2, index=price_series.index)
 
 def fit_polynomial(x_vals: np.ndarray, y_vals: np.ndarray, degree: int = 2) -> np.ndarray:
     """
@@ -62,7 +76,7 @@ def eval_polynomial(coeffs: np.ndarray, x_vals: np.ndarray) -> np.ndarray:
 def get_polynomial_features(price_series: pd.Series, window: int = 21, degree: int = 2):
     """
     Roll a polynomial fit of specified degree over the series and return
-    three pd.Series of the coefficients (a, b, c for degree=2).
+    three pd.Series of the polynomial coefficients (a, b, c for degree=2).
     """
     length = len(price_series)
     if length < window:
