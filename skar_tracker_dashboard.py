@@ -159,13 +159,13 @@ elif page == "About":
     """)
 # DERIVATIVE DIAGNOSTICS
 elif page == "Strategy Overview":
-        st.title("Strategy Overview")
+            st.title("Strategy Overview")
 
     st.markdown("""
     This section provides a live view of the strategy's derivative-based logic. You can select any stock ticker to visualize its price, first derivative (slope), and second derivative (acceleration).
 
-    - **Slope (Momentum)** helps detect increasing or decreasing trend velocity.
-    - **Acceleration (Curvature)** highlights inflection points and potential regime shifts.
+    - Slope (Momentum) helps detect increasing or decreasing trend velocity.
+    - Acceleration (Curvature) highlights inflection points and potential regime shifts.
 
     Use the entry and exit threshold sliders to simulate how signals would be generated on different assets.
     """)
