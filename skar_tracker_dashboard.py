@@ -161,14 +161,14 @@ elif page == "About":
 elif page == "Strategy Overview":
     st.title("Strategy Overview")
 
-    st.markdown(\"\"\"
+    st.markdown("""
     This section provides a live view of the strategy's derivative-based logic. You can select any stock ticker to visualize its price, first derivative (slope), and second derivative (acceleration).
 
     - Slope (Momentum) helps detect increasing or decreasing trend velocity.
     - Acceleration (Curvature) highlights inflection points and potential regime shifts.
 
     Use the entry and exit threshold sliders to simulate how signals would be generated on different assets.
-    \"\"\")
+    """)
 
     ticker = st.sidebar.text_input("Ticker", value="SPY").upper()
     start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2010-01-01"))
@@ -180,7 +180,6 @@ elif page == "Strategy Overview":
     slope = get_slope(price)
     accel = get_acceleration(price)
     signals = generate_signals(slope, accel, entry, exit, use_acceleration=True)
-
 # POLYNOMIAL FIT CURVE
 elif page == "Polynomial Fit Curve":
     st.title("Polynomial Fit Curve Analysis")
