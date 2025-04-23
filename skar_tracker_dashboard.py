@@ -158,15 +158,28 @@ elif page == "About":
     The Skarre Signal is not intended as financial advice or a final product. Instead, it is an evolving model and presentation tool — built to explore whether mathematical rigor and optimization can consistently outperform intuition in dynamic financial systems.
     """)
 # DERIVATIVE DIAGNOSTICS
-elif page == "Derivative Diagnostics":
-    st.title("Derivative Diagnostics")
-    price_series = get_data("SPY", "2022-01-01", "2024-12-31")["Price"]
-    slope = get_slope(price_series)
-    accel = get_acceleration(price_series)
+elif page == "Strategy Overview":
+    st.title("Strategy Overview")
 
-    st.line_chart(price_series.rename("SPY Price"))
-    st.line_chart(slope.rename("Slope (1st Derivative)"))
-    st.line_chart(accel.rename("Acceleration (2nd Derivative)"))
+    st.markdown(\"\"\"
+    This section provides a live view of the strategy's derivative-based logic. You can select any stock ticker to visualize its price, first derivative (slope), and second derivative (acceleration).
+
+    - Slope (Momentum) helps detect increasing or decreasing trend velocity.
+    - Acceleration (Curvature) highlights inflection points and potential regime shifts.
+
+    Use the entry and exit threshold sliders to simulate how signals would be generated on different assets.
+    \"\"\")
+
+    ticker = st.sidebar.text_input("Ticker", value="SPY").upper()
+    start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2010-01-01"))
+    end_date = st.sidebar.date_input("End Date", pd.to_datetime("today"))
+    entry = st.sidebar.slider("Entry Threshold", 0.0, 2.0, 0.5)
+    exit = st.sidebar.slider("Exit Threshold", -2.0, 0.0, -0.5)
+
+    price = get_data(ticker, start_date, end_date)["Price"]
+    slope = get_slope(price)
+    accel = get_acceleration(price)
+    signals = generate_signals(slope, accel, entry, exit, use_acceleration=True)
 
 # POLYNOMIAL FIT CURVE
 elif page == "Polynomial Fit Curve":
