@@ -81,7 +81,7 @@ elif page == "About":
     st.title("Engineering, Optimization, and Comparison of Algorithmic Trading")
 
     st.markdown("""
-    This dashboard is the core deliverable of an independent research project titled **“Engineering, Optimization, and Comparison of Algorithmic Trading.”**  
+    This dashboard is the core deliverable of an independent research project titled “Engineering, Optimization, and Comparison of Algorithmic Trading.”  
     The project investigates whether structured, engineering-based techniques can be used to design, analyze, and optimize algorithmic trading strategies that outperform passive benchmarks.
 
     ### Research Objectives
@@ -96,9 +96,9 @@ elif page == "About":
     ### Methodology Overview
 
     The system:
-    - Uses **Savitzky–Golay filters** to smooth price data while preserving critical turning points
+    - Uses Savitzky–Golay filters to smooth price data while preserving critical turning points
     - Computes **first and second derivatives** (slope and curvature) to detect acceleration-based signals
-    - Applies **threshold logic** to identify long/exit conditions based on derivative magnitudes and direction
+    - Applies threshold logic to identify long/exit conditions based on derivative magnitudes and direction
     - Performs backtests with full metrics including Sharpe ratio, drawdown, win rate, and ROI
     - Benchmarks strategy output against SPY buy-and-hold to evaluate relative performance
 
@@ -153,7 +153,7 @@ elif page == "About":
     ### Conclusion
 
     This dashboard reflects a structured, engineering-first approach to market modeling.  
-    It was developed as part of the academic study **“Engineering, Optimization, and Comparison of Algorithmic Trading,”** which blends principles from mechanical systems analysis, data science, and quantitative finance. 
+    It was developed as part of the academic study "Engineering, Optimization, and Comparison of Algorithmic Trading,” which blends principles from mechanical systems analysis, data science, and quantitative finance. 
 
     The Skarre Signal is not intended as financial advice or a final product. Instead, it is an evolving model and presentation tool — built to explore whether mathematical rigor and optimization can consistently outperform intuition in dynamic financial systems.
     """)
@@ -177,9 +177,26 @@ elif page == "Strategy Overview":
     exit = st.sidebar.slider("Exit Threshold", -2.0, 0.0, -0.5)
 
     price = get_data(ticker, start_date, end_date)["Price"]
+
+    if price.empty:
+        st.error(f"No data found for {ticker}. Try a different symbol or date range.")
+        st.stop()
+
     slope = get_slope(price)
     accel = get_acceleration(price)
     signals = generate_signals(slope, accel, entry, exit, use_acceleration=True)
+
+    # Price with signals
+    st.subheader(f"{ticker} Price with Signals")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=price.index, y=price, name="Price", line=dict(color="black")))
+    fig.add_trace(go.Scatter(x=price[signals == 1].index, y=price[signals == 1], name="Buy", mode='markers', marker=dict(color='green', symbol='triangle-up', size=8))))
+    fig.add_trace(go.Scatter(x=price[signals == -1].index, y=price[signals == -1], name="Sell", mode='markers', marker=dict(color='red', symbol='triangle-down', size=8))))
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Derivative diagnostics
+    st.subheader("Slope (Momentum) and Acceleration (Curvature)")
+    st.line_chart(pd.DataFrame({"Slope": slope, "Acceleration": accel}))
 # POLYNOMIAL FIT CURVE
 elif page == "Polynomial Fit Curve":
     st.title("Polynomial Fit Curve Analysis")
