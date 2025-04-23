@@ -162,13 +162,14 @@ elif page == "Strategy Overview":
     st.title("Strategy Overview")
 
     st.markdown("""
-    Explore live signals and derivatives for any stock ticker.
+    This section visualizes how derivatives—slope (momentum) and acceleration (curvature)—inform buy/sell signals.
 
-    - **Slope (Momentum)**: Measures trend velocity
-    - **Acceleration (Curvature)**: Detects inflection points or regime shifts
-    - **Buy/Sell Signals**: Based on polynomial-based threshold logic
+    - Slope identifies trend velocity.
+    - Acceleration detects shifts in momentum direction.
+    - Use any ticker and threshold combo to explore signal logic.
     """)
 
+    # Sidebar controls
     ticker = st.sidebar.text_input("Ticker", value="SPY").upper()
     start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2010-01-01"))
     end_date = st.sidebar.date_input("End Date", pd.to_datetime("today"))
@@ -176,17 +177,20 @@ elif page == "Strategy Overview":
     exit = st.sidebar.slider("Exit Threshold", -2.0, 0.0, -0.5)
 
     try:
+        # Load data
         price = get_data(ticker, start_date, end_date)["Price"]
-
         if price.empty:
             st.warning(f"No price data found for {ticker}.")
             st.stop()
 
+        st.write(f"Loaded {len(price)} data points for {ticker}")
+
+        # Compute derivatives
         slope = get_slope(price)
         accel = get_acceleration(price)
         signals = generate_signals(slope, accel, entry, exit, use_acceleration=True)
 
-        # Signal overlay chart
+        # Plot signals on price
         st.subheader(f"{ticker} Price with Buy/Sell Signals")
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=price.index, y=price, name="Price", line=dict(color="black")))
@@ -196,7 +200,7 @@ elif page == "Strategy Overview":
                                  marker=dict(color='red', symbol='triangle-down', size=8)))
         st.plotly_chart(fig, use_container_width=True)
 
-        # Derivative plots
+        # Plot slope and acceleration
         st.subheader("Slope (Momentum) and Acceleration (Curvature)")
         st.line_chart(pd.DataFrame({"Slope": slope, "Acceleration": accel}))
 
