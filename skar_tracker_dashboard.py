@@ -159,13 +159,13 @@ elif page == "About":
     """)
 # DERIVATIVE DIAGNOSTICS
 elif page == "Strategy Overview":
-    st.title("Strategy Overview")
+        st.title("Strategy Overview")
 
     st.markdown("""
     This section provides a live view of the strategy's derivative-based logic. You can select any stock ticker to visualize its price, first derivative (slope), and second derivative (acceleration).
 
-    - Slope (Momentum) helps detect increasing or decreasing trend velocity.
-    - Acceleration (Curvature) highlights inflection points and potential regime shifts.
+    - **Slope (Momentum)** helps detect increasing or decreasing trend velocity.
+    - **Acceleration (Curvature)** highlights inflection points and potential regime shifts.
 
     Use the entry and exit threshold sliders to simulate how signals would be generated on different assets.
     """)
@@ -186,13 +186,15 @@ elif page == "Strategy Overview":
     accel = get_acceleration(price)
     signals = generate_signals(slope, accel, entry, exit, use_acceleration=True)
 
-    # Price with signals
-    st.subheader(f"{ticker} Price with Signals")
+    st.subheader(f"{ticker} Price with Buy/Sell Signals")
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=price.index, y=price, name="Price", line=dict(color="black")))
-    fig.add_trace(go.Scatter(x=price[signals == 1].index, y=price[signals == 1], name="Buy", mode='markers', marker=dict(color='green', symbol='triangle-up', size=8))))
-    fig.add_trace(go.Scatter(x=price[signals == -1].index, y=price[signals == -1], name="Sell", mode='markers', marker=dict(color='red', symbol='triangle-down', size=8))))
+    fig.add_trace(go.Scatter(x=price[signals == 1].index, y=price[signals == 1], name="Buy", mode='markers', marker=dict(color='green', symbol='triangle-up', size=8)))
+    fig.add_trace(go.Scatter(x=price[signals == -1].index, y=price[signals == -1], name="Sell", mode='markers', marker=dict(color='red', symbol='triangle-down', size=8)))
     st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Slope (Momentum) and Acceleration (Curvature)")
+    st.line_chart(pd.DataFrame({"Slope": slope, "Acceleration": accel}))
 
     # Derivative diagnostics
     st.subheader("Slope (Momentum) and Acceleration (Curvature)")
