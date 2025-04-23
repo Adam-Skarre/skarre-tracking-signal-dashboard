@@ -162,45 +162,52 @@ elif page == "Strategy Overview":
     st.title("Derivative Diagnostics")
 
     st.markdown("""
-    Explore Skarre's derivative-based trading signals for any stock and time period.  
-    This module shows where momentum shifts or reversals are identified through first and second derivatives of price data.
-
-    **Features:**
-    - Slope (1st derivative): Market momentum
-    - Acceleration (2nd derivative): Momentum changes
-    - Buy/Sell signals based on threshold logic
+    This section shows how Skarre uses slope (momentum) and acceleration (curvature) to trigger buy and sell signals.  
+    You can adjust thresholds, inspect the results visually, and compare performance to a basic buy-and-hold strategy.
     """)
 
-    ticker = st.sidebar.text_input("Enter Ticker Symbol", value="SPY").upper()
-    start_date = st.sidebar.date_input("Start Date", datetime(2010, 1, 1))
+    ticker = st.sidebar.text_input("Ticker", value="SPY").upper()
+    start_date = st.sidebar.date_input("Start Date", datetime(2020, 1, 1))
     end_date = st.sidebar.date_input("End Date", datetime.today())
     entry_th = st.sidebar.slider("Entry Threshold", 0.0, 2.0, 0.5, 0.1)
     exit_th = st.sidebar.slider("Exit Threshold", -2.0, 0.0, -0.5, 0.1)
     show_signals = st.sidebar.checkbox("Show Skarre Buy/Sell Points", value=True)
+    fast_mode = st.sidebar.checkbox("Fast Load Mode (downsample)", value=False)
 
-    price_df = get_data(ticker, start_date, end_date)
-    if price_df.empty:
+    @st.cache_data(show_spinner=False)
+    def cached_data(ticker, start_date, end_date):
+        df = get_data(ticker, start_date, end_date)
+        return df["Price"]
+
+    price_series = cached_data(ticker, start_date, end_date)
+    if price_series.empty:
         st.warning("No data found for this ticker and date range.")
         st.stop()
 
-    price_series = price_df["Price"]
     slope = get_slope(price_series)
     accel = get_acceleration(price_series)
     signals = generate_signals(slope, accel, entry_th, exit_th, use_acceleration=True)
 
-    # Price chart with optional signals
+    if fast_mode:
+        # Downsample everything
+        price_series = price_series.iloc[::5]
+        slope = slope.iloc[::5]
+        accel = accel.iloc[::5]
+        signals = signals.iloc[::5]
+
+    # Price + signal plot
+    st.subheader(f"{ticker} Price with Signals")
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=price_series.index, y=price_series, mode='lines', name='Price'))
+    fig.add_trace(go.Scatter(x=price_series.index, y=price_series, name="Price", line=dict(color="black")))
 
     if show_signals:
         buy_points = price_series[signals == 1]
         sell_points = price_series[signals == -1]
-        fig.add_trace(go.Scatter(x=buy_points.index, y=buy_points, mode='markers', name='Buy Signal',
-                                 marker=dict(color='green', size=8, symbol='triangle-up')))
-        fig.add_trace(go.Scatter(x=sell_points.index, y=sell_points, mode='markers', name='Sell Signal',
-                                 marker=dict(color='red', size=8, symbol='triangle-down')))
+        fig.add_trace(go.Scatter(x=buy_points.index, y=buy_points, mode="markers", name="Buy",
+                                 marker=dict(color="green", symbol="triangle-up", size=8)))
+        fig.add_trace(go.Scatter(x=sell_points.index, y=sell_points, mode="markers", name="Sell",
+                                 marker=dict(color="red", symbol="triangle-down", size=8)))
 
-    fig.update_layout(title=f"{ticker} Price with Skarre Signals", height=500)
     st.plotly_chart(fig, use_container_width=True)
 
     # Derivatives
@@ -210,14 +217,23 @@ elif page == "Strategy Overview":
     st.subheader("Acceleration (Curvature)")
     st.line_chart(pd.DataFrame({'Acceleration': accel}))
 
-    # Backtest comparison
+    # Optional: show coefficients or threshold preview
+    with st.expander("Show Recent Derivative Values (for debugging)"):
+        st.dataframe(pd.DataFrame({
+            "Price": price_series,
+            "Slope": slope,
+            "Acceleration": accel,
+            "Signal": signals
+        }).tail(15))
+
+    # Backtest
     st.subheader("Backtest: Strategy vs Buy & Hold")
     result = backtest(price_series, signals)
     equity_curve = result["equity_curve"]
     buy_hold = (1 + price_series.pct_change().fillna(0)).cumprod()
 
     st.line_chart(pd.DataFrame({
-        "Skarre Equity": equity_curve,
+        "Skarre Strategy": equity_curve,
         "Buy & Hold": buy_hold
     }))
 # POLYNOMIAL FIT CURVE
