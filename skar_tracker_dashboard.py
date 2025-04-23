@@ -162,9 +162,13 @@ elif page == "Strategy Overview":
     st.title("Derivative Diagnostics")
 
     st.markdown("""
-    This module lets you explore Skarre's slope and acceleration signals for any stock and timeframe. It highlights where momentum shifts or trend reversals are mathematically identified through polynomial derivatives.
-    
-    You can toggle signal visibility, adjust thresholds, and compare the strategy to a passive benchmark.
+    Explore Skarre's derivative-based trading signals for any stock and time period.  
+    This module shows where momentum shifts or reversals are identified through first and second derivatives of price data.
+
+    **Features:**
+    - Slope (1st derivative): Market momentum
+    - Acceleration (2nd derivative): Momentum changes
+    - Buy/Sell signals based on threshold logic
     """)
 
     ticker = st.sidebar.text_input("Enter Ticker Symbol", value="SPY").upper()
@@ -184,6 +188,7 @@ elif page == "Strategy Overview":
     accel = get_acceleration(price_series)
     signals = generate_signals(slope, accel, entry_th, exit_th, use_acceleration=True)
 
+    # Price chart with optional signals
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=price_series.index, y=price_series, mode='lines', name='Price'))
 
@@ -198,16 +203,22 @@ elif page == "Strategy Overview":
     fig.update_layout(title=f"{ticker} Price with Skarre Signals", height=500)
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("Derivative Preview")
+    # Derivatives
+    st.subheader("Slope (Momentum)")
     st.line_chart(pd.DataFrame({'Slope': slope}))
+
+    st.subheader("Acceleration (Curvature)")
     st.line_chart(pd.DataFrame({'Acceleration': accel}))
 
+    # Backtest comparison
     st.subheader("Backtest: Strategy vs Buy & Hold")
     result = backtest(price_series, signals)
     equity_curve = result["equity_curve"]
+    buy_hold = (1 + price_series.pct_change().fillna(0)).cumprod()
+
     st.line_chart(pd.DataFrame({
         "Skarre Equity": equity_curve,
-        "Buy & Hold": (1 + price_series.pct_change().fillna(0)).cumprod()
+        "Buy & Hold": buy_hold
     }))
 # POLYNOMIAL FIT CURVE
 elif page == "Polynomial Fit Curve":
