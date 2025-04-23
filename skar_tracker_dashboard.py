@@ -159,7 +159,7 @@ elif page == "About":
     """)
 # DERIVATIVE DIAGNOSTICS
 elif page == "Strategy Overview":
-            st.title("Strategy Overview")
+    st.title("Strategy Overview")
 
     st.markdown("""
     This section provides a live view of the strategy's derivative-based logic. You can select any stock ticker to visualize its price, first derivative (slope), and second derivative (acceleration).
@@ -193,10 +193,6 @@ elif page == "Strategy Overview":
     fig.add_trace(go.Scatter(x=price[signals == -1].index, y=price[signals == -1], name="Sell", mode='markers', marker=dict(color='red', symbol='triangle-down', size=8)))
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("Slope (Momentum) and Acceleration (Curvature)")
-    st.line_chart(pd.DataFrame({"Slope": slope, "Acceleration": accel}))
-
-    # Derivative diagnostics
     st.subheader("Slope (Momentum) and Acceleration (Curvature)")
     st.line_chart(pd.DataFrame({"Slope": slope, "Acceleration": accel}))
 # POLYNOMIAL FIT CURVE
