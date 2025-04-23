@@ -221,6 +221,24 @@ elif page == "Derivative Diagnostics":
 # POLYNOMIAL FIT CURVE
 elif page == "Polynomial Fit Curve":
     st.title("Polynomial Fit Curve Analysis")
+    st.markdown("""
+    In financial markets, price is the surface.  What lies beneath is a dynamic system—
+    one we can probe with the tools of engineering.
+
+    By fitting a rolling polynomial curve to recent data, we don’t chase noise or lagging
+    averages.  Instead, we treat price as the output of a continuously evolving system, 
+    and capture its *shape*—its bends, its inflection points, its hidden structure.
+
+    This view reflects our core beliefs:
+    1. **Markets are complex dynamic systems**, best understood through modeling, not guesswork.
+    2. **Predictive clarity** comes from smoothing complexity just enough to see the trend
+       without oversimplifying.
+    3. **Engineering principles**—rigor, repeatability, validation—belong at the heart of
+       any trading strategy.
+
+    Slide the window size to see how much structure you reveal vs how much noise you tolerate.
+    """)
+    
     ticker_poly = st.sidebar.text_input("Ticker for Polynomial Fit", value="SPY").upper()
     price_poly = get_data(ticker_poly, "2022-01-01", "2024-12-31")["Price"]
     window = st.sidebar.slider("Polynomial Fit Window Size", 10, 50, 21, 2)
