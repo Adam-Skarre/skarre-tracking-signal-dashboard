@@ -170,42 +170,62 @@ Use the controls below to select your ticker, date range, and thresholds.
 """)
 
     # Sidebar controls
-    ticker     = st.sidebar.text_input("Ticker Symbol", value="SPY").upper()
-    start_date = st.sidebar.date_input("Start Date",  datetime(2010, 1, 1))
-    end_date   = st.sidebar.date_input("End Date",   datetime.today())
-    entry_th   = st.sidebar.slider("Entry Threshold (slope)", 0.0, 5.0, 0.5, 0.1)
-    exit_th    = st.sidebar.slider("Exit Threshold (slope)", -5.0, 0.0, -0.5, 0.1)
-    show_signals = st.sidebar.checkbox("Show Buy/Sell Markers", value=True)
+    ticker        = st.sidebar.text_input("Ticker Symbol", "SPY").upper()
+    start_date    = st.sidebar.date_input("Start Date",  datetime(2010, 1, 1))
+    end_date      = st.sidebar.date_input("End Date",   datetime.today())
+    entry_th      = st.sidebar.slider("Entry Threshold (slope)",    0.0, 5.0, 0.5, 0.1)
+    exit_th       = st.sidebar.slider("Exit Threshold (slope)",    -5.0, 0.0, -0.5, 0.1)
+    use_accel     = st.sidebar.checkbox("Use Acceleration Signal", value=False)
+    show_markers  = st.sidebar.checkbox("Show Buy/Sell Markers",   value=True)
 
-    # Fetch price data
-    price_df = load_data_or_get_data(ticker, start_date, end_date)
+    # Fetch price data using get_data (not load_data_or_get_data)
+    price_df = get_data(ticker, start_date, end_date)
     if price_df.empty:
-        st.warning(f"No data for {ticker} in that range.")
+        st.warning(f"No data found for {ticker} in that date range.")
         st.stop()
 
     price_series = price_df["Price"]
-    slope  = get_slope(price_series)
-    accel  = get_acceleration(price_series)
 
-    # generate slope‐only signals
+    # Compute derivatives
+    slope = get_slope(price_series)
+    accel = get_acceleration(price_series)
+
+    # Generate signals
     signals = generate_signals(
-        slope, accel,
-        entry_th, exit_th,
-        use_acceleration=False
+        slope,
+        accel,
+        entry_th,
+        exit_th,
+        use_acceleration=use_accel
     )
 
-    # Price + signal chart
+    # Plot price & markers
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=price_series.index, y=price_series, mode="lines", name=f"{ticker} Price"))
-    if show_signals:
+    fig.add_trace(go.Scatter(
+        x=price_series.index, y=price_series,
+        mode="lines", name=f"{ticker} Price"
+    ))
+    if show_markers:
         buys  = price_series[signals ==  1]
         sells = price_series[signals == -1]
-        fig.add_trace(go.Scatter(x=buys.index,  y=buys,  mode="markers", name="Buy",  marker=dict(color="green", symbol="triangle-up",   size=8)))
-        fig.add_trace(go.Scatter(x=sells.index, y=sells, mode="markers", name="Sell", marker=dict(color="red",   symbol="triangle-down", size=8)))
-    fig.update_layout(title=f"{ticker} Price & Signals", xaxis_title="Date", yaxis_title="Price", height=500)
+        fig.add_trace(go.Scatter(
+            x=buys.index,  y=buys,
+            mode="markers", name="Buy",
+            marker=dict(color="green", symbol="triangle-up", size=8)
+        ))
+        fig.add_trace(go.Scatter(
+            x=sells.index, y=sells,
+            mode="markers", name="Sell",
+            marker=dict(color="red", symbol="triangle-down", size=8)
+        ))
+    fig.update_layout(
+        title=f"{ticker} Price & Signals",
+        xaxis_title="Date", yaxis_title="Price",
+        height=500
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-    # Derivative plots side by side
+    # Plot derivatives side by side
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Slope (1st Derivative)")
@@ -213,21 +233,6 @@ Use the controls below to select your ticker, date range, and thresholds.
     with col2:
         st.subheader("Acceleration (2nd Derivative)")
         st.line_chart(pd.DataFrame({"Acceleration": accel}))
-    # Slope & Acceleration plots
-    st.subheader("Slope (Momentum)")
-    st.line_chart(pd.DataFrame({"Slope": slope}))
-    st.subheader("Acceleration (Curvature)")
-    st.line_chart(pd.DataFrame({"Acceleration": accel}))
-
-    # Backtest comparison
-    st.subheader("Backtest vs Buy & Hold")
-    result       = backtest(price, signals)
-    equity_curve = result["equity_curve"]
-    buy_hold     = (1 + price.pct_change().fillna(0)).cumprod()
-    st.line_chart(pd.DataFrame({
-        "Skarre Strategy": equity_curve,
-        "Buy & Hold":     buy_hold
-    }))
 # POLYNOMIAL FIT CURVE
 elif page == "Polynomial Fit Curve":
     st.title("Polynomial Fit Curve Analysis")
