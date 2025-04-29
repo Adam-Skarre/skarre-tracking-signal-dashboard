@@ -1,40 +1,4 @@
-# ─── SKARRE LIBRARY LOADER ─────────────────────────────────────────────────────
-import os, sys, importlib
-
-BASE_DIR   = os.path.dirname(__file__)
-SKAR_LIB   = os.path.join(BASE_DIR, "skar_lib")
-
-# Ensure both BASE_DIR and SKAR_LIB are on sys.path
-for p in (BASE_DIR, SKAR_LIB):
-    if p and p not in sys.path:
-        sys.path.insert(0, p)
-
-def _import(name):
-    """
-    Try `import name` or fallback to `import skar_lib.name`.
-    """
-    try:
-        return importlib.import_module(name)
-    except ImportError:
-        return importlib.import_module(f"skar_lib.{name}")
-
-# Load your modules
-_pf  = _import("polynomial_fit")
-_sl  = _import("signal_logic")
-_bt  = _import("backtester")
-_opt = _import("optimizer")
-_val = _import("validate_skarre_signal")
-
-# Bind the functions you need
-get_slope              = _pf.get_slope
-get_acceleration       = _pf.get_acceleration
-generate_skarre_signal = _sl.generate_skarre_signal
-backtest               = _bt.backtest
-evaluate_strategy      = _bt.evaluate_strategy
-grid_search_optimizer  = _opt.grid_search_optimizer
-bootstrap_sharpe       = _val.bootstrap_sharpe
-regime_performance     = _val.regime_performance
-# ───────────────────────────────────────────────────────────────────────────────
+# skar_tracker_dashboard.py
 
 import streamlit as st
 import yfinance as yf
@@ -43,8 +7,23 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
+# Core modules (must reside alongside this file)
+from polynomial_fit          import get_slope, get_acceleration
+from signal_logic            import generate_skarre_signal
+from backtester              import backtest, evaluate_strategy
+from optimizer               import grid_search_optimizer
+from validate_skarre_signal  import bootstrap_sharpe, regime_performance
+
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
-# …and then the rest of your dashboard file unchanged…
+
+@st.cache_data(show_spinner=False)
+def get_data(ticker, start, end):
+    """
+    Fetch Adjusted Close price for ticker between start/end dates.
+    """
+    df = yf.download(ticker, start=start, end=end, progress=False)[['Close']].dropna()
+    df.columns = ['Price']
+    return df
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
@@ -57,421 +36,226 @@ page = st.sidebar.radio("Select View", [
     "Threshold Optimization",
     "Strategy Performance",
     "Trade Log"
-])
+], key="nav_page")
 
-@st.cache_data(show_spinner=False)
-def get_data(ticker, start, end):
-    df = yf.download(ticker, start=start, end=end, progress=False)
-    df = df[['Close']].dropna()
-    df.columns = ['Price']
-    return df
-
-# LIVE SIGNAL TRACKER
-if page == "Live Signal Tracker":
-    st.title("Live Signal Tracker")
-
-    ticker = st.sidebar.text_input("Enter Ticker Symbol", value="SPY").upper()
-    start_date = st.sidebar.date_input("Start Date", datetime(2022, 1, 1))
-    end_date = st.sidebar.date_input("End Date", datetime(2024, 12, 31))
-    entry_th = st.sidebar.slider("Entry Threshold", 0.0, 2.0, 0.5, 0.1)
-    exit_th = st.sidebar.slider("Exit Threshold", -2.0, 0.0, -0.5, 0.1)
-    entry_th     = st.sidebar.slider("Entry Threshold",        0.0, 2.0, 0.5, 0.1)
-    exit_th      = st.sidebar.slider("Exit Threshold",       -2.0, 0.0, -0.5, 0.1)
-
-    # ← Insert these three lines for SST thresholds & minimum hold
-    entry_sst    = st.sidebar.slider("Entry SST Threshold",    0.0, 2.0, 1.0, 0.1)
-    exit_sst     = st.sidebar.slider("Exit SST Threshold",   -2.0, 0.0, -1.0, 0.1)
-    holding_days = st.sidebar.slider("Minimum Holding Days",     1,  20,   5)
-
-    show_signals = st.sidebar.checkbox("Show Skarre Buy/Sell Points", value=True)
-
-    price_df = get_data(ticker, start_date, end_date)
-    if price_df.empty:
-        st.warning("No data found for this ticker and date range.")
-        st.stop()
-
-    price_series = price_df["Price"]
-    slope = get_slope(price_series)
-    accel = get_acceleration(price_series)
-    signals = generate_skarre_signal(
-    price_series,
-    entry_slope_threshold= entry_th,
-    exit_slope_threshold=  exit_th,
-    entry_sst_threshold=   entry_sst,
-    exit_sst_threshold=    exit_sst,
-    min_holding_days=      holding_days
-)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=price_series.index, y=price_series, mode='lines', name='Price'))
-    if show_signals:
-        buy_points = price_series[signals == 1]
-        sell_points = price_series[signals == -1]
-        fig.add_trace(go.Scatter(x=buy_points.index, y=buy_points, mode='markers', name='Buy Signal',
-                                 marker=dict(color='green', size=8, symbol='triangle-up')))
-        fig.add_trace(go.Scatter(x=sell_points.index, y=sell_points, mode='markers', name='Sell Signal',
-                                 marker=dict(color='red', size=8, symbol='triangle-down')))
-    fig.update_layout(title=f"{ticker} Price with Skarre Signals", height=500)
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.subheader("Derivative Preview")
-    st.line_chart(pd.DataFrame({'Slope': slope}))
-    st.line_chart(pd.DataFrame({'Acceleration': accel}))
-
-    result = backtest(price_series, signals)
-    equity_curve = result["equity_curve"]
-    st.subheader("Strategy vs Buy & Hold")
-    st.line_chart(pd.DataFrame({
-        "Skarre Equity": equity_curve,
-        "Buy & Hold": (1 + price_series.pct_change().fillna(0)).cumprod()
-    }))
-
-# ABOUT
-elif page == "About":
-    st.title("Engineering, Optimization, and Comparison of Algorithmic Trading")
-
+# === About ===
+if page == "About":
+    st.title("🔎 About Skarre Tracker")
     st.markdown("""
-    This dashboard is the core deliverable of an independent research project titled “Engineering, Optimization, and Comparison of Algorithmic Trading.”  
-    The project investigates whether structured, engineering-based techniques can be used to design, analyze, and optimize algorithmic trading strategies that outperform passive benchmarks.
-
-    ### Research Objectives
-
-    The primary goals of the study are to:
-    - Apply mathematical modeling and calculus to extract actionable structure from market data
-    - Develop a signal generation system using first and second derivatives of price curves
-    - Optimize entry/exit thresholds for improved performance across various regimes
-    - Compare strategy behavior to passive investing (e.g. SPY, QQQ) through backtesting
-    - Present findings in a transparent, interactive format
-
-    ### Methodology Overview
-
-    The system:
-    - Uses Savitzky–Golay filters to smooth price data while preserving critical turning points
-    - Computes **first and second derivatives** (slope and curvature) to detect acceleration-based signals
-    - Applies threshold logic to identify long/exit conditions based on derivative magnitudes and direction
-    - Performs backtests with full metrics including Sharpe ratio, drawdown, win rate, and ROI
-    - Benchmarks strategy output against SPY buy-and-hold to evaluate relative performance
-
-    ### System Features
-
-    This dashboard allows users to:
-    - Select tickers and explore real-time signal overlays
-    - Visualize moving slopes and curvature-based inflection zones
-    - Run parameter sweeps and generate heatmaps for optimization
-    - Compare strategy returns against traditional market exposure
-    - Download trade logs and inspect signal performance over time
-
-    ### Live Performance Results (SPY: 2020–2024)
-
-    The results below are dynamically generated using the strategy's current thresholds:
+    **Skarre Tracker v2.0** is a research-grade trading dashboard:
+    - **Slope (1st derivative)** and **Acceleration (2nd derivative)** based signals
+    - **Standardized Skarre Score (SST)**: deviation from MA / volatility
+    - **Walk-forward validation**, **dynamic transaction costs**, **bootstrap Sharpe**, **regime analysis**
+    - **4-parameter optimization**: entry/exit slope & entry/exit SST
     """)
+    st.caption("For research & educational purposes only.")
 
-    # Live backtest result for SPY (2020–2024)
-    price = get_data("SPY", "2020-01-01", "2024-12-31")["Price"]
-    slope = get_slope(price)
-    accel = get_acceleration(price)
-    signals = generate_signals(slope, accel, 0.5, -0.5, use_acceleration=True)
-    result = backtest(price, signals)
-
-    buy_hold = (1 + price.pct_change().fillna(0)).cumprod()
-    buy_hold_drawdown = (buy_hold / buy_hold.cummax() - 1).min()
-
-    comparison_df = pd.DataFrame({
-        "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
-        "Skarre Signal": [
-            f"{(result['equity_curve'].iloc[-1] - 1) * 100:.1f}%",
-            f"{result['performance']['Sharpe']:.2f}",
-            f"{result['performance']['Max Drawdown'] * 100:.0f}%",
-            f"{result['performance']['Win Rate'] * 100:.0f}%",
-            f"{result['performance']['Trade Frequency']:.1f}"
-        ],
-        "SPY (Buy & Hold)": [
-            f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
-            "N/A",
-            f"{buy_hold_drawdown * 100:.0f}%",
-            "N/A",
-            "1"
-        ]
-    }).set_index("Metric")
-
-    with st.expander("View Live Performance Table"):
-        st.dataframe(comparison_df)
-
-    st.markdown("""
-    *Note: These values are computed using fixed thresholds (entry = 0.5, exit = –0.5) over the 2020–2024 period, and are subject to change based on market conditions.*
-
-    ### Conclusion
-
-    This dashboard reflects a structured, engineering-first approach to market modeling.  
-    It was developed as part of the academic study "Engineering, Optimization, and Comparison of Algorithmic Trading,” which blends principles from mechanical systems analysis, data science, and quantitative finance. 
-
-    The Skarre Signal is not intended as financial advice or a final product. Instead, it is an evolving model and presentation tool — built to explore whether mathematical rigor and optimization can consistently outperform intuition in dynamic financial systems.
-    """)
-# DERIVATIVE DIAGNOSTICS
-# --- Derivative Diagnostics Page ---
-elif page == "Derivative Diagnostics":
-    st.title("Derivative Diagnostics")
-    st.markdown("""
-Explore Skarre’s **slope** and **acceleration** signals for any ticker and timeframe.
-- **Slope (1st derivative)** = rate of change (momentum)  
-- **Acceleration (2nd derivative)** = change of momentum (regime shifts)
-
-Use the controls below to select your ticker, date range, and thresholds.
-""")
+# === Live Signal Tracker ===
+elif page == "Live Signal Tracker":
+    st.title("📈 Live Signal Tracker")
+    st.markdown("Overlay real-time Skarre signals on price data.")
 
     # Sidebar controls
-    ticker        = st.sidebar.text_input("Ticker Symbol", "SPY").upper()
-    start_date    = st.sidebar.date_input("Start Date",  datetime(2010, 1, 1))
-    end_date      = st.sidebar.date_input("End Date",   datetime.today())
-    entry_th      = st.sidebar.slider("Entry Threshold (slope)",    0.0, 5.0, 0.5, 0.1)
-    exit_th       = st.sidebar.slider("Exit Threshold (slope)",    -5.0, 0.0, -0.5, 0.1)
-    use_accel     = st.sidebar.checkbox("Use Acceleration Signal", value=False)
-    show_markers  = st.sidebar.checkbox("Show Buy/Sell Markers",   value=True)
+    ticker       = st.sidebar.text_input("Enter Ticker Symbol", "SPY", key="live_ticker").upper()
+    start_date   = st.sidebar.date_input("Start Date", datetime(2022,1,1), key="live_start")
+    end_date     = st.sidebar.date_input("End Date",   datetime(2024,12,31), key="live_end")
+    entry_slope  = st.sidebar.slider("Entry Slope Threshold",  0.0, 0.5, 0.1, step=0.01, key="live_entry_slope")
+    exit_slope   = st.sidebar.slider("Exit Slope Threshold",  -0.5, 0.0, -0.1, step=0.01, key="live_exit_slope")
+    entry_sst    = st.sidebar.slider("Entry SST Threshold",    0.0, 2.0, 1.0, step=0.1, key="live_entry_sst")
+    exit_sst     = st.sidebar.slider("Exit SST Threshold",    -2.0, 0.0, -1.0, step=0.1, key="live_exit_sst")
+    holding_days = st.sidebar.slider("Min. Holding Days",      1,   20,   5, key="live_holding_days")
+    show_pts     = st.sidebar.checkbox("Show Buy/Sell Markers", True, key="live_show_markers")
 
-    # Fetch price data using get_data (not load_data_or_get_data)
-    price_df = get_data(ticker, start_date, end_date)
-    if price_df.empty:
-        st.warning(f"No data found for {ticker} in that date range.")
+    # Load data
+    df = get_data(ticker, start_date, end_date)
+    if df.empty:
+        st.warning("No data found for that ticker/date range.")
         st.stop()
 
-    price_series = price_df["Price"]
-
-    # Compute derivatives
-    slope = get_slope(price_series)
-    accel = get_acceleration(price_series)
-
-    # Generate signals
-    signals = generate_signals(
-        slope,
-        accel,
-        entry_th,
-        exit_th,
-        use_acceleration=use_accel
+    price_series = df['Price']
+    slope  = get_slope(price_series)
+    accel  = get_acceleration(price_series)
+    signals = generate_skarre_signal(
+        price_series,
+        entry_slope_threshold=entry_slope,
+        exit_slope_threshold= exit_slope,
+        entry_sst_threshold=  entry_sst,
+        exit_sst_threshold=   exit_sst,
+        min_holding_days=     holding_days
     )
 
-    # Plot price & markers
+    # Price & signals chart
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=price_series.index, y=price_series,
-        mode="lines", name=f"{ticker} Price"
-    ))
-    if show_markers:
-        buys  = price_series[signals ==  1]
-        sells = price_series[signals == -1]
-        fig.add_trace(go.Scatter(
-            x=buys.index,  y=buys,
-            mode="markers", name="Buy",
-            marker=dict(color="green", symbol="triangle-up", size=8)
-        ))
-        fig.add_trace(go.Scatter(
-            x=sells.index, y=sells,
-            mode="markers", name="Sell",
-            marker=dict(color="red", symbol="triangle-down", size=8)
-        ))
-    fig.update_layout(
-        title=f"{ticker} Price & Signals",
-        xaxis_title="Date", yaxis_title="Price",
-        height=500
-    )
+    fig.add_trace(go.Scatter(x=price_series.index, y=price_series, mode='lines', name='Price'))
+    if show_pts:
+        buys  = price_series[signals==1]
+        sells = price_series[signals==-1]
+        fig.add_trace(go.Scatter(x=buys.index, y=buys, mode='markers', name='Buy', marker=dict(color='green',symbol='triangle-up',size=8)))
+        fig.add_trace(go.Scatter(x=sells.index, y=sells, mode='markers', name='Sell', marker=dict(color='red',symbol='triangle-down',size=8)))
+    fig.update_layout(title=f"{ticker} Price & Skarre Signals", height=500)
     st.plotly_chart(fig, use_container_width=True)
+    st.caption("Green▲=Buy, Red▼=Sell")
 
-    # Plot derivatives side by side
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Slope (1st Derivative)")
-        st.line_chart(pd.DataFrame({"Slope": slope}))
-    with col2:
-        st.subheader("Acceleration (2nd Derivative)")
-        st.line_chart(pd.DataFrame({"Acceleration": accel}))
-# POLYNOMIAL FIT CURVE
+    # Derivative preview
+    st.subheader("Derivative Preview: Slope & Acceleration")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.line_chart(pd.DataFrame({'Slope': slope}))
+        st.caption("Slope = rate of change (momentum)")
+    with c2:
+        st.line_chart(pd.DataFrame({'Acceleration': accel}))
+        st.caption("Acceleration = change of momentum")
+
+    # Equity & metrics
+    res = backtest(price_series, signals)
+    eq = res['equity_curve']
+    bh = (1+price_series.pct_change().fillna(0)).cumprod()
+    st.subheader("Equity Curve vs Buy & Hold")
+    st.line_chart(pd.DataFrame({'Strategy':eq,'Buy & Hold':bh}))
+    st.caption("Cumulative returns comparison")
+
+    perf = res['performance']
+    st.subheader("Performance Metrics")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Sharpe Ratio", f"{perf['Sharpe']:.2f}")
+    m2.metric("Total Return", f"{perf['Total Return']*100:.2f}%")
+    m3.metric("Max Drawdown", f"{perf['Max Drawdown']*100:.2f}%")
+    m4.metric("Trades/Year", f"{perf['Trade Frequency']:.1f}")
+    st.caption("Costs & slippage applied dynamically")
+
+# === Derivative Diagnostics ===
+elif page == "Derivative Diagnostics":
+    st.title("⚙️ Derivative Diagnostics")
+    st.markdown("Inspect slope & acceleration distributions.")
+
+    ticker2    = st.sidebar.text_input("Ticker Symbol", "SPY", key="diag_ticker").upper()
+    sd2        = st.sidebar.date_input("Start Date", datetime(2010,1,1), key="diag_start")
+    ed2        = st.sidebar.date_input("End Date",   datetime.today(), key="diag_end")
+    show_marks = st.sidebar.checkbox("Show Buy/Sell Markers", True, key="diag_show")
+
+    df2 = get_data(ticker2, sd2, ed2)
+    if df2.empty:
+        st.warning("No data found.")
+        st.stop()
+    ps2 = df2['Price']
+    sl2 = get_slope(ps2)
+    ac2 = get_acceleration(ps2)
+
+    st.subheader("Slope & Acceleration Lines")
+    st.line_chart(pd.DataFrame({'Slope': sl2, 'Acceleration': ac2}))
+    st.caption("Use these to identify threshold values before trading.")
+
+# === Polynomial Fit Curve ===
 elif page == "Polynomial Fit Curve":
-    st.title("Polynomial Fit Curve Analysis")
-    st.markdown("""
-    In financial markets, price is the surface.  What lies beneath is a dynamic system—
-    one we can probe with the tools of engineering.
+    st.title("🔧 Polynomial Fit Curve")
+    st.markdown("Fit a rolling 2nd-degree polynomial to price data.")
 
-    By fitting a rolling polynomial curve to recent data, we don’t chase noise or lagging
-    averages.  Instead, we treat price as the output of a continuously evolving system, 
-    and capture its *shape*—its bends, its inflection points, its hidden structure.
+    ticker_pf = st.sidebar.text_input("Ticker for Polynomial Fit", "SPY", key="pf_ticker").upper()
+    window    = st.sidebar.slider("Window Size", 10, 50, 21, step=2, key="pf_window")
 
-    This view reflects our core beliefs:
-    1. **Markets are complex dynamic systems**, best understood through modeling, not guesswork.
-    2. **Predictive clarity** comes from smoothing complexity just enough to see the trend
-       without oversimplifying.
-    3. **Engineering principles**—rigor, repeatability, validation—belong at the heart of
-       any trading strategy.
+    df_pf = get_data(ticker_pf, "2022-01-01", "2024-12-31")['Price']
+    xv    = np.arange(window)
+    fits, dates = [], []
+    for i in range(window, len(df_pf)):
+        yvals  = df_pf.iloc[i-window:i].values
+        coeffs = np.polyfit(xv, yvals, 2)
+        fits.append(np.poly1d(coeffs)(xv)[-1])
+        dates.append(df_pf.index[i-1])
+    fit_s = pd.Series(fits, index=dates)
 
-    Slide the window size to see how much structure you reveal vs how much noise you tolerate.
-    """)
-    
-    ticker_poly = st.sidebar.text_input("Ticker for Polynomial Fit", value="SPY").upper()
-    price_poly = get_data(ticker_poly, "2022-01-01", "2024-12-31")["Price"]
-    window = st.sidebar.slider("Polynomial Fit Window Size", 10, 50, 21, 2)
+    fig3 = go.Figure()
+    fig3.add_trace(go.Scatter(x=df_pf.index, y=df_pf, name='Price'))
+    fig3.add_trace(go.Scatter(x=fit_s.index, y=fit_s, name='Poly Fit'))
+    st.plotly_chart(fig3, use_container_width=True)
+    st.caption("Rolling polynomial fit captures curvature and inflection.")
 
-    x_vals = np.arange(window)
-    fit_values = []
-    dates = []
-
-    for i in range(window, len(price_poly)):
-        y_vals = price_poly.iloc[i - window:i].values
-        coeffs = np.polyfit(x_vals, y_vals, 2)
-        poly = np.poly1d(coeffs)
-        fit_curve = poly(x_vals)
-        fit_values.append(fit_curve[-1])
-        dates.append(price_poly.index[i - 1])
-
-    fit_series = pd.Series(fit_values, index=dates)
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=price_poly.index, y=price_poly, name="Price", line=dict(color="black")))
-    fig.add_trace(go.Scatter(x=fit_series.index, y=fit_series, name="Poly Fit (Rolling)", line=dict(color="blue")))
-    st.plotly_chart(fig, use_container_width=True)
-
-# DERIVATIVE HISTOGRAMS
+# === Derivative Histograms ===
 elif page == "Derivative Histograms":
-    st.title("Slope and Acceleration Histograms")
+    st.title("📊 Derivative Histograms")
+    st.markdown("Distribution of slope & acceleration values for SPY (2022–2024).)
 
-    # Load price and compute derivatives
-    price_hist = get_data("SPY", "2022-01-01", "2024-12-31")["Price"]
-    slope_hist = get_slope(price_hist)
-    accel_hist = get_acceleration(price_hist)
+    df_h = get_data("SPY", "2022-01-01", "2024-12-31")['Price']
+    s_h = get_slope(df_h)
+    a_h = get_acceleration(df_h)
+    def make_hist(x):
+        counts, bins = np.histogram(x.dropna(), bins=30)
+        return pd.Series(counts, index=bins[:-1])
 
-    # Format bins as clean midpoints
-    def format_histogram(series, bins=30):
-        counts, bin_edges = np.histogram(series.dropna(), bins=bins)
-        midpoints = 0.5 * (bin_edges[1:] + bin_edges[:-1])
-        return pd.Series(counts, index=[f"{x:.2f}" for x in midpoints])
-
-    # Slope
     st.subheader("Slope Distribution")
-    slope_bins = format_histogram(slope_hist)
-    st.bar_chart(slope_bins)
+    st.bar_chart(make_hist(s_h))
+    st.caption("Frequency of 1st-derivative (momentum) values.")
 
-    # Acceleration
     st.subheader("Acceleration Distribution")
-    accel_bins = format_histogram(accel_hist)
-    st.bar_chart(accel_bins)
+    st.bar_chart(make_hist(a_h))
+    st.caption("Frequency of 2nd-derivative (change of momentum) values.")
 
-    st.markdown("""
-    These histograms visualize the frequency of slope and acceleration values from SPY's price data.
-
-    - **Slope (1st derivative)** reflects the **rate of change in price** — essentially the momentum.
-    - **Acceleration (2nd derivative)** measures how that momentum itself is changing — identifying curvature or regime shifts.
-
-    By analyzing these distributions, you can identify which values are common, rare, or extreme — useful for setting effective signal thresholds.
-    """)
-
-# THRESHOLD OPTIMIZATION
+# === Threshold Optimization ===
 elif page == "Threshold Optimization":
-    st.title("Threshold Optimization Heatmap")
+    st.title("🌡️ Threshold Optimization")
+    st.markdown("Heatmap of Sharpe ratio over slope & SST thresholds.")
 
-    # Data and derivatives
-    price_opt = get_data("SPY", "2022-01-01", "2024-12-31")["Price"]
-    slope_opt = get_slope(price_opt)
-    accel_opt = get_acceleration(price_opt)
+    price_opt = get_data("SPY", "2022-01-01", "2024-12-31")['Price']
+    entry_slope_grid = np.linspace(0,0.5,6)
+    exit_slope_grid  = np.linspace(-0.5,0,6)
+    entry_sst_grid   = np.linspace(0,2,5)
+    exit_sst_grid    = np.linspace(-2,0,5)
 
-    # Threshold grid
-    entry_range = np.arange(0.0, 1.1, 0.1)
-    exit_range = np.arange(-1.0, 0.1, 0.1)
-    heatmap = []
-
-    for entry in entry_range:
-        row = []
-        for exit in exit_range:
-            signals = generate_signals(slope_opt, accel_opt, entry, exit, use_acceleration=True)
-            result = backtest(price_opt, signals)
-            row.append(result["performance"]["Sharpe"])
-        heatmap.append(row)
-
-    heatmap_df = pd.DataFrame(
-        heatmap, 
-        index=[f"{e:.1f}" for e in entry_range], 
-        columns=[f"{x:.1f}" for x in exit_range]
+    best, best_sh, df_opt = grid_search_optimizer(
+        price_opt,
+        entry_slope_grid, exit_slope_grid,
+        entry_sst_grid, exit_sst_grid
     )
 
-    # Render heatmap
-    st.subheader("Sharpe Ratio Heatmap (Entry vs Exit Threshold)")
-    st.dataframe(heatmap_df.style.background_gradient(cmap="RdYlGn", axis=None))
+    st.write(f"**Best Parameters:** slope_in={best[0]}, slope_out={best[1]}, sst_in={best[2]}, sst_out={best[3]}  → Sharpe {best_sh:.2f}")
+    heatmap = df_opt.pivot("entry_slope","exit_sst","Sharpe")
+    st.dataframe(heatmap.style.background_gradient(axis=None))
+    st.caption("Green cells = better risk-adjusted performance.")
 
-    st.markdown("""
-    The heatmap displays the **Sharpe Ratio** — a risk-adjusted return metric — for each pair of entry and exit thresholds.
-
-    - **Entry Threshold** (Y-axis): Minimum slope to enter a trade — higher values mean stronger upward momentum is required.
-    - **Exit Threshold** (X-axis): Maximum (negative) slope to trigger an exit — lower values exit trades earlier on downward shifts.
-
-    **How to read this:**
-    - Green cells = better Sharpe ratios → stronger risk-adjusted performance
-    - Red cells = underperforming combinations
-    - Look for consistent green zones to identify optimal threshold regions for your strategy
-    """)
-
-# STRATEGY PERFORMANCE
+# === Strategy Performance ===
 elif page == "Strategy Performance":
-    st.title("Strategy Performance (SPY Example)")
-    price_series = get_data("SPY", "2022-01-01", "2024-12-31")["Price"]
-    slope = get_slope(price_series)
-    accel = get_acceleration(price_series)
-    signals = generate_skarre_signal(
-    price_series,
-    entry_slope_threshold= 0.5,
-    exit_slope_threshold=  -0.5,
-    entry_sst_threshold=   0.0,
-    exit_sst_threshold=    0.0,
-    min_holding_days=      5
-)
-    result = backtest(price_series, signals)
+    st.title("🚀 Strategy Performance")
+    st.markdown("Equity curve comparison & regime analysis for SPY.")
 
-    if result['trade_log'].empty:
-        st.warning("No trades triggered for SPY under default thresholds.")
-    else:
-        perf = result['performance']
-        equity_curve = result["equity_curve"]
-        buy_hold = (1 + price_series.pct_change().fillna(0)).cumprod()
+    df_sp = get_data("SPY", "2022-01-01", "2024-12-31")['Price']
+    sig_sp = generate_skarre_signal(df_sp, *best, min_holding_days=5)
+    res_sp = backtest(df_sp, sig_sp)
+    eq_sp  = res_sp['equity_curve']
+    bh_sp  = (1+df_sp.pct_change().fillna(0)).cumprod()
 
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Sharpe Ratio", f"{perf['Sharpe']:.2f}")
-        col2.metric("Max Drawdown", f"{perf['Max Drawdown']:.0%}")
-        col3.metric("Win Rate", f"{perf['Win Rate']:.0%}")
-        col4.metric("Trades/Year", f"{perf['Trade Frequency']:.1f}")
+    st.subheader("Equity Curve")
+    st.line_chart(pd.DataFrame({'Strategy': eq_sp, 'Buy & Hold': bh_sp}))
+    st.caption("Cumulative returns of strategy vs passive benchmark.")
 
-        st.line_chart(pd.DataFrame({
-            "Skarre Equity": equity_curve,
-            "Buy & Hold": buy_hold
-        }))
+    st.subheader("Performance Metrics")
+    df_perf = pd.DataFrame(res_sp['performance'], index=["Metric"]).T
+    st.dataframe(df_perf.style.format({"Sharpe": "{:.2f}", "Total Return": "{:.1%}", "Max Drawdown": "{:.1%}", "Trade Frequency": "{:.1f}"}))
 
-        st.subheader("Final Value Comparison")
-        comparison_df = pd.DataFrame({
-            "Total Return (%)": [
-                (equity_curve.iloc[-1] - 1) * 100,
-                (buy_hold.iloc[-1] - 1) * 100
-            ],
-            "CAGR (%)": [
-                ((equity_curve.iloc[-1]) ** (1 / 2.8) - 1) * 100,
-                ((buy_hold.iloc[-1]) ** (1 / 2.8) - 1) * 100
-            ]
-        }, index=["Skarre Strategy", "Buy & Hold"])
-        st.dataframe(comparison_df.style.format("{:.2f}"))
+    st.subheader("Regime Analysis")
+    df_reg = regime_performance(
+        df_sp, generate_skarre_signal,
+        entry_slope_threshold=best[0],
+        exit_slope_threshold= best[1],
+        entry_sst_threshold=   best[2],
+        exit_sst_threshold=    best[3],
+        min_holding_days=      5
+    )
+    st.dataframe(df_reg)
+    st.caption("Performance segmented by bull/sideways/bear markets.")
 
-# TRADE LOG
+# === Trade Log ===
 elif page == "Trade Log":
-    st.title("Trade Log (SPY Example)")
-    price_series = get_data("SPY", "2022-01-01", "2024-12-31")["Price"]
-    slope = get_slope(price_series)
-    accel = get_acceleration(price_series)
-    signals = generate_skarre_signal(
-    price_series,
-    entry_slope_threshold= 0.5,
-    exit_slope_threshold=  -0.5,
-    entry_sst_threshold=   0.0,
-    exit_sst_threshold=    0.0,
-    min_holding_days=      5
-)
-    result = backtest(price_series, signals)
-    trade_df = result.get("trade_log", pd.DataFrame())
+    st.title("🗒️ Trade Log")
+    st.markdown("List of executed trades for SPY.")
 
-    if trade_df.empty:
-        st.warning("No trades to display.")
+    df_tl    = get_data("SPY", "2022-01-01", "2024-12-31")['Price']
+    sig_tl   = generate_skarre_signal(df_tl, *best, min_holding_days=5)
+    res_tl   = backtest(df_tl, sig_tl)
+    trade_log= res_tl.get('trade_log', pd.DataFrame())
+
+    if trade_log.empty:
+        st.warning("No trades executed under current thresholds.")
     else:
-        st.dataframe(trade_df)
-        csv = trade_df.to_csv(index=False)
-        st.download_button("Download Trade Log CSV", csv, file_name="SPY_trade_log.csv")
+        st.dataframe(trade_log)
+        csv = trade_log.to_csv(index=False)
+        st.download_button("Download Trade Log CSV", csv, "trade_log.csv")
+        st.caption("Timestamped entries and exits.")
