@@ -1,8 +1,39 @@
 # skar_tracker_dashboard.py
 
-import os, sys
-# ─ add this so Python finds your modules alongside this script ─
-sys.path.insert(0, os.path.dirname(__file__))
+import os
+import importlib.util
+
+# ─── DYNAMIC MODULE LOADER ──────────────────────────────────────────────────────
+BASE_DIR = os.path.dirname(__file__)
+
+def _load_module(name):
+    """
+    Load a .py file from this folder as a module named `name`.
+    """
+    path = os.path.join(BASE_DIR, f"{name}.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+# Load modules (polynomial_fit.py, signal_logic.py, etc.) dynamically:
+_pf    = _load_module("polynomial_fit")
+_sl    = _load_module("signal_logic")
+_bt    = _load_module("backtester")
+_opt   = _load_module("optimizer")
+_val   = _load_module("validate_skarre_signal")
+
+# Bind the functions you need:
+get_slope              = _pf.get_slope
+get_acceleration       = _pf.get_acceleration
+generate_skarre_signal = _sl.generate_skarre_signal
+backtest               = _bt.backtest
+evaluate_strategy      = _bt.evaluate_strategy
+grid_search_optimizer  = _opt.grid_search_optimizer
+bootstrap_sharpe       = _val.bootstrap_sharpe
+regime_performance     = _val.regime_performance
+# ────────────────────────────────────────────────────────────────────────────────
+
 
 import streamlit as st
 import yfinance as yf
@@ -11,16 +42,9 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
-# now import from your local .py files
-from polynomial_fit           import get_slope, get_acceleration
-from signal_logic             import generate_skarre_signal
-from backtester               import backtest, evaluate_strategy
-from optimizer                import grid_search_optimizer
-from validate_skarre_signal   import bootstrap_sharpe, regime_performance
-
-
-
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
+
+# … the rest of your 413-line dashboard unchanged …
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
