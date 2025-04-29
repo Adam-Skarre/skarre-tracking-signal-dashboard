@@ -1,5 +1,12 @@
 # skar_tracker_dashboard.py
+import os, sys
 
+# ─── ENSURE skar_lib/ IS ON PYTHON PATH ─────────────────────────────────────────
+BASE_DIR    = os.path.dirname(__file__)
+SKAR_LIB_DIR = os.path.join(BASE_DIR, "skar_lib")
+if os.path.isdir(SKAR_LIB_DIR) and SKAR_LIB_DIR not in sys.path:
+    sys.path.insert(0, SKAR_LIB_DIR)
+# ────────────────────────────────────────────────────────────────────────────────
 import streamlit as st
 import yfinance as yf
 import pandas as pd
