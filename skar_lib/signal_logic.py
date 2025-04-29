@@ -1,42 +1,66 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 
+def get_slope(prices: pd.Series, window: int = 5) -> pd.Series:
+    """
+    1st derivative (momentum) via rolling linear fit.
+    """
+    return prices.diff().rolling(window).mean().fillna(0)
 
-def generate_signals(
-    slope_series: pd.Series,
-    accel_series: pd.Series = None,
-    entry_slope: float = 0.0,
-    exit_slope: float = 0.0,
-    use_acceleration: bool = False
+def get_acceleration(prices: pd.Series, window: int = 5) -> pd.Series:
+    """
+    2nd derivative: change of slope.
+    """
+    slope = get_slope(prices, window)
+    return slope.diff().fillna(0)
+
+def generate_skarre_signal(
+    price_series: pd.Series,
+    entry_slope_threshold: float,
+    exit_slope_threshold: float,
+    entry_sst_threshold: float,
+    exit_sst_threshold: float,
+    slope_window: int = 5,
+    ma_window: int = 20,
+    vol_window: int = 20,
+    min_holding_days: int = 1
 ) -> pd.Series:
     """
-    Generate long/flat position signals based on slope and optional acceleration.
-
-    Parameters:
-    - slope_series: pd.Series of first derivative values (slope)
-    - accel_series: pd.Series of second derivative values (acceleration)
-    - entry_slope: threshold above which to enter a long position
-    - exit_slope: threshold below which to exit the long position
-    - use_acceleration: if True, require accel_series > 0 for entry and < 0 for exit
-
-    Returns:
-    - pd.Series of integer positions: 1 for long, 0 for flat
+    Combined slope + SST signal.
+    SST = (price - rolling MA) / rolling volatility.
     """
-    n = len(slope_series)
-    positions = np.zeros(n, dtype=int)
-    current_pos = 0
+    # Derivatives
+    slope = get_slope(price_series, slope_window)
+    accel = get_acceleration(price_series, slope_window)
 
-    for i in range(1, n):
-        slope = slope_series.iloc[i]
-        accel = accel_series.iloc[i] if (use_acceleration and accel_series is not None) else None
+    # SST
+    ma  = price_series.rolling(ma_window).mean()
+    vol = price_series.pct_change().rolling(vol_window).std().fillna(price_series.pct_change().std())
+    sst = ((price_series - ma) / vol).fillna(0)
 
-        # Entry rule
-        if current_pos <= 0 and slope > entry_slope and (not use_acceleration or accel > 0):
-            current_pos = 1
-        # Exit rule
-        elif current_pos >= 1 and slope < exit_slope and (not use_acceleration or accel < 0):
-            current_pos = 0
+    # Generate positions
+    positions = pd.Series(0, index=price_series.index)
+    pos = 0
+    last_change = None
 
-        positions[i] = current_pos
+    for idx in price_series.index:
+        if last_change is None:
+            held = min_holding_days
+        else:
+            held = (idx - last_change).days
 
-    return pd.Series(positions, index=slope_series.index)
+        cslope = slope.loc[idx]
+        csst   = sst.loc[idx]
+
+        # Entry
+        if pos == 0 and cslope > entry_slope_threshold and csst > entry_sst_threshold and held >= min_holding_days:
+            pos = 1
+            last_change = idx
+        # Exit
+        elif pos == 1 and (cslope < exit_slope_threshold or csst < exit_sst_threshold) and held >= min_holding_days:
+            pos = 0
+            last_change = idx
+
+        positions.loc[idx] = pos
+
+    return positions
