@@ -1,5 +1,9 @@
 # skar_tracker_dashboard.py
 
+
+import os, sys
+sys.path.insert(0, os.path.dirname(__file__))
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -7,7 +11,7 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
-# ← Replace the old skar_lib.* imports with these:
+# Now these will load from the same folder
 from polynomial_fit             import get_slope, get_acceleration
 from signal_logic               import generate_skarre_signal
 from backtester                 import backtest, evaluate_strategy
