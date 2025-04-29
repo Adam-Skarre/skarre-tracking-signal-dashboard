@@ -1,113 +1,74 @@
-# backtester.py
-
 import pandas as pd
 import numpy as np
-from signal_logic import generate_skarre_signal
-from optimizer import grid_search_optimizer
 
-def evaluate_strategy(price_series, signal_series, cost_params=None):
-    """
-    Evaluate performance of a trading signal.
-    Returns: Sharpe, total return, max drawdown, trades, cumulative returns
-    """
-    returns = price_series.pct_change().fillna(0)
-    signal = signal_series.shift(1).reindex(returns.index).fillna(0)
-    strat_returns = returns * signal
-
-    # Transaction cost model
-    vol = returns.rolling(20).std().fillna(returns.std())
-    base_cost = cost_params.get("base_cost", 0.001) if cost_params else 0.001
-    slip_factor = cost_params.get("slippage_factor", 0.5) if cost_params else 0.5
-    cost_per_trade = base_cost + slip_factor * vol
-    trades = signal.diff().abs()
-    cost_penalty = cost_per_trade * trades
-
-    net_returns = strat_returns - cost_penalty
-    cumulative = (1 + net_returns).cumprod()
-
-    mean = net_returns.mean()
-    std = net_returns.std(ddof=1)
-    sharpe = (mean / std) * np.sqrt(252) if std > 0 else np.nan
-    total_return = cumulative.iloc[-1] - 1
-    max_dd = (cumulative / cumulative.cummax() - 1).min()
-    trade_count = trades.sum()
-
-    return sharpe, total_return, max_dd, trade_count, cumulative
-
-
-def walk_forward_backtest(
-    price_series,
-    entry_slope_grid,
-    exit_slope_grid,
-    entry_sst_grid,
-    exit_sst_grid,
-    cost_params=None,
-    train_years=5,
-    test_years=1,
-    min_holding_days=5,
-    slope_window=5,
-    ma_window=20,
-    vol_window=20
+def evaluate_strategy(
+    price_series: pd.Series,
+    signal_series: pd.Series,
+    cost_params: dict = None
 ):
     """
-    Performs walk-forward optimization and backtesting.
-    Returns DataFrame of performance by window.
+    Returns: sharpe, total_return, max_drawdown, trade_count, cumulative_returns
     """
-    result_rows = []
-    start_dates = pd.date_range(price_series.index[0], price_series.index[-1], freq='12M')
+    # Basic returns & signal alignment
+    returns = price_series.pct_change().fillna(0)
+    sig     = signal_series.shift(1).fillna(0)
+    strat_r = returns * sig
 
-    for start in start_dates:
-        train_end = start + pd.DateOffset(years=train_years) - pd.Timedelta(days=1)
-        test_end = train_end + pd.DateOffset(years=test_years)
+    # Dynamic cost
+    vol = returns.rolling(20).std().fillna(returns.std())
+    base = cost_params.get("base_cost", 0.001) if cost_params else 0.001
+    slip = cost_params.get("slippage_factor", 0.5) if cost_params else 0.5
+    cost = base + slip * vol
 
-        train_data = price_series[start:train_end]
-        test_data = price_series[train_end + pd.Timedelta(days=1):test_end]
+    trades       = sig.diff().abs()
+    cost_penalty = cost * trades
 
-        if len(train_data) < 252 * train_years or len(test_data) < 252 * test_years:
-            continue
+    net_r   = strat_r - cost_penalty
+    cum     = (1 + net_r).cumprod()
 
-        # Optimize on train
-        best_params, _, _ = grid_search_optimizer(
-            train_data,
-            entry_slope_grid,
-            exit_slope_grid,
-            entry_sst_grid,
-            exit_sst_grid,
-            slope_window,
-            ma_window,
-            vol_window,
-            min_holding_days,
-            cost_params
-        )
+    mean    = net_r.mean()
+    std     = net_r.std(ddof=1)
+    sharpe  = (mean / std) * np.sqrt(252) if std > 0 else np.nan
+    tot_ret = cum.iloc[-1] - 1
+    max_dd  = (cum / cum.cummax() - 1).min()
+    n_trades= int(trades.sum())
 
-        # Apply on test
-        es, xs, est, xst = best_params
-        signal_test = generate_skarre_signal(
-            test_data,
-            entry_slope_threshold=es,
-            exit_slope_threshold=xs,
-            entry_sst_threshold=est,
-            exit_sst_threshold=xst,
-            slope_window=slope_window,
-            ma_window=ma_window,
-            vol_window=vol_window,
-            min_holding_days=min_holding_days
-        )
+    return sharpe, tot_ret, max_dd, n_trades, cum
 
-        sharpe, ret, dd, trades, _ = evaluate_strategy(test_data, signal_test, cost_params)
+def backtest(
+    price_series: pd.Series,
+    signal_series: pd.Series,
+    cost_params: dict = None
+) -> dict:
+    """
+    Returns a dict with:
+      - performance: {Sharpe, Total Return, Max Drawdown, Trade Frequency}
+      - equity_curve: pd.Series
+      - trade_log: pd.DataFrame
+    """
+    sharpe, tot_ret, max_dd, n_trades, cum = evaluate_strategy(
+        price_series, signal_series, cost_params
+    )
 
-        result_rows.append({
-            "train_start": start.date(),
-            "train_end": train_end.date(),
-            "test_end": test_end.date(),
-            "entry_slope": es,
-            "exit_slope": xs,
-            "entry_sst": est,
-            "exit_sst": xst,
-            "Sharpe": sharpe,
-            "Return": ret,
-            "Drawdown": dd,
-            "Trades": trades
-        })
+    # Build a simple trade log
+    log = []
+    prev = signal_series.iloc[0]
+    for idx, curr in signal_series.iteritems():
+        if curr != prev:
+            log.append({"Date": idx, "Position": curr})
+            prev = curr
+    trade_df = pd.DataFrame(log)
 
-    return pd.DataFrame(result_rows)
+    years = (price_series.index[-1] - price_series.index[0]).days / 365
+    perf = {
+        "Sharpe": sharpe,
+        "Total Return": tot_ret,
+        "Max Drawdown": max_dd,
+        "Trade Frequency": n_trades / years if years > 0 else n_trades
+    }
+
+    return {
+        "performance": perf,
+        "equity_curve": cum,
+        "trade_log": trade_df
+    }
