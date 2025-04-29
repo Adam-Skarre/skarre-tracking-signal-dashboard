@@ -1,29 +1,31 @@
-# skar_tracker_dashboard.py
+# ─── DYNAMIC MODULE LOADER FOR skar_lib ────────────────────────────────────────
+import os, importlib.util, sys
 
-import os
-import importlib.util
-
-# ─── DYNAMIC MODULE LOADER ──────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(__file__)
+LIB_DIR  = os.path.join(BASE_DIR, "skar_lib")
 
 def _load_module(name):
     """
-    Load a .py file from this folder as a module named `name`.
+    Load name.py from skar_lib/ as module `name`.
     """
-    path = os.path.join(BASE_DIR, f"{name}.py")
+    path = os.path.join(LIB_DIR, f"{name}.py")
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
-# Load modules (polynomial_fit.py, signal_logic.py, etc.) dynamically:
-_pf    = _load_module("polynomial_fit")
-_sl    = _load_module("signal_logic")
-_bt    = _load_module("backtester")
-_opt   = _load_module("optimizer")
-_val   = _load_module("validate_skarre_signal")
+# Ensure skar_lib is on sys.path too (in case submodules import each other)
+if LIB_DIR not in sys.path:
+    sys.path.insert(0, LIB_DIR)
 
-# Bind the functions you need:
+# Load all your helper modules
+_pf  = _load_module("polynomial_fit")
+_sl  = _load_module("signal_logic")
+_bt  = _load_module("backtester")
+_opt = _load_module("optimizer")
+_val = _load_module("validate_skarre_signal")
+
+# Bind the functions you need
 get_slope              = _pf.get_slope
 get_acceleration       = _pf.get_acceleration
 generate_skarre_signal = _sl.generate_skarre_signal
