@@ -1,12 +1,39 @@
-# skar_tracker_dashboard.py
+# ─── SKARRE LIBRARY LOADER ─────────────────────────────────────────────────────
+import os, sys, importlib
 
-import os, sys
+BASE_DIR   = os.path.dirname(__file__)
+SKAR_LIB   = os.path.join(BASE_DIR, "skar_lib")
 
-# ─── MODULE PATH SETUP ─────────────────────────────────────────────────────────
-BASE_DIR     = os.path.dirname(__file__)
-SKAR_LIB_DIR = os.path.join(BASE_DIR, "skar_lib")
-if SKAR_LIB_DIR not in sys.path:
-    sys.path.insert(0, SKAR_LIB_DIR)
+# Ensure both BASE_DIR and SKAR_LIB are on sys.path
+for p in (BASE_DIR, SKAR_LIB):
+    if p and p not in sys.path:
+        sys.path.insert(0, p)
+
+def _import(name):
+    """
+    Try `import name` or fallback to `import skar_lib.name`.
+    """
+    try:
+        return importlib.import_module(name)
+    except ImportError:
+        return importlib.import_module(f"skar_lib.{name}")
+
+# Load your modules
+_pf  = _import("polynomial_fit")
+_sl  = _import("signal_logic")
+_bt  = _import("backtester")
+_opt = _import("optimizer")
+_val = _import("validate_skarre_signal")
+
+# Bind the functions you need
+get_slope              = _pf.get_slope
+get_acceleration       = _pf.get_acceleration
+generate_skarre_signal = _sl.generate_skarre_signal
+backtest               = _bt.backtest
+evaluate_strategy      = _bt.evaluate_strategy
+grid_search_optimizer  = _opt.grid_search_optimizer
+bootstrap_sharpe       = _val.bootstrap_sharpe
+regime_performance     = _val.regime_performance
 # ───────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
@@ -16,16 +43,8 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
-# Helper module imports
-from polynomial_fit          import get_slope, get_acceleration
-from signal_logic            import generate_skarre_signal
-from backtester              import backtest, evaluate_strategy
-from optimizer               import grid_search_optimizer
-from validate_skarre_signal  import bootstrap_sharpe, regime_performance
-
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
-
-# … the rest of your 413-line dashboard unchanged …
+# …and then the rest of your dashboard file unchanged…
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
