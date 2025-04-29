@@ -1,41 +1,13 @@
-# ─── DYNAMIC MODULE LOADER FOR skar_lib ────────────────────────────────────────
-import os, importlib.util, sys
+# skar_tracker_dashboard.py
 
-BASE_DIR = os.path.dirname(__file__)
-LIB_DIR  = os.path.join(BASE_DIR, "skar_lib")
+import os, sys
 
-def _load_module(name):
-    """
-    Load name.py from skar_lib/ as module `name`.
-    """
-    path = os.path.join(LIB_DIR, f"{name}.py")
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-# Ensure skar_lib is on sys.path too (in case submodules import each other)
-if LIB_DIR not in sys.path:
-    sys.path.insert(0, LIB_DIR)
-
-# Load all your helper modules
-_pf  = _load_module("polynomial_fit")
-_sl  = _load_module("signal_logic")
-_bt  = _load_module("backtester")
-_opt = _load_module("optimizer")
-_val = _load_module("validate_skarre_signal")
-
-# Bind the functions you need
-get_slope              = _pf.get_slope
-get_acceleration       = _pf.get_acceleration
-generate_skarre_signal = _sl.generate_skarre_signal
-backtest               = _bt.backtest
-evaluate_strategy      = _bt.evaluate_strategy
-grid_search_optimizer  = _opt.grid_search_optimizer
-bootstrap_sharpe       = _val.bootstrap_sharpe
-regime_performance     = _val.regime_performance
-# ────────────────────────────────────────────────────────────────────────────────
-
+# ─── MODULE PATH SETUP ─────────────────────────────────────────────────────────
+BASE_DIR     = os.path.dirname(__file__)
+SKAR_LIB_DIR = os.path.join(BASE_DIR, "skar_lib")
+if SKAR_LIB_DIR not in sys.path:
+    sys.path.insert(0, SKAR_LIB_DIR)
+# ───────────────────────────────────────────────────────────────────────────────
 
 import streamlit as st
 import yfinance as yf
@@ -43,6 +15,13 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
+
+# Helper module imports
+from polynomial_fit          import get_slope, get_acceleration
+from signal_logic            import generate_skarre_signal
+from backtester              import backtest, evaluate_strategy
+from optimizer               import grid_search_optimizer
+from validate_skarre_signal  import bootstrap_sharpe, regime_performance
 
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
 
