@@ -7,18 +7,12 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
-# V2 backend imports
--from skar_lib.polynomial_fit import get_slope, get_acceleration
--from skar_lib.signal_logic   import generate_skarre_signal
--from skar_lib.backtester      import backtest, evaluate_strategy
--from skar_lib.optimizer       import grid_search_optimizer
--from skar_lib.validate_skarre_signal import bootstrap_sharpe, regime_performance
-+from polynomial_fit import get_slope, get_acceleration
-+from signal_logic   import generate_skarre_signal
-+from backtester     import backtest, evaluate_strategy
-+from optimizer      import grid_search_optimizer
-+from validate_skarre_signal import bootstrap_sharpe, regime_performance
-st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
+# ← Replace the old skar_lib.* imports with these:
+from polynomial_fit             import get_slope, get_acceleration
+from signal_logic               import generate_skarre_signal
+from backtester                 import backtest, evaluate_strategy
+from optimizer                  import grid_search_optimizer
+from validate_skarre_signal     import bootstrap_sharpe, regime_performance
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
