@@ -59,7 +59,7 @@ if page == "About":
 
 # === Live Signal Tracker ===
 elif page == "Live Signal Tracker":
-    st.title("📈 Live Signal Tracker")
+    st.title("Live Signal Tracker")
     st.markdown("Overlay real-time Skarre signals on price data with adjustable thresholds.")
 
     # Sidebar controls
