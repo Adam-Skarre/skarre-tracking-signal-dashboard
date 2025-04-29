@@ -1,45 +1,81 @@
+# validate_skarre_signal.py
+
 import numpy as np
 import pandas as pd
-from skar_lib.data_loader import download_price_data
-from skar_lib.polynomial_fit import get_slope, get_acceleration
-from skar_lib.signal_logic import generate_signals
-from skar_lib.backtester import backtest
+from signal_logic import generate_skarre_signal
+from backtester import evaluate_strategy
+import matplotlib.pyplot as plt
 
-tickers = ["SPY", "QQQ", "DIA", "AAPL", "MSFT", "XLF"]
-start_date = "2015-01-01"
-end_date = "2024-12-31"
-entry_threshold = 0.5
-exit_threshold = -0.5
+def bootstrap_sharpe(returns, n_bootstrap=10000):
+    """
+    Returns observed Sharpe ratio and p-value from bootstrap sampling.
+    """
+    returns = returns.dropna()
+    obs_sharpe = (returns.mean() / returns.std(ddof=1)) * np.sqrt(252)
 
-results = []
+    bootstraps = []
+    for _ in range(n_bootstrap):
+        sample = np.random.choice(returns, size=len(returns), replace=True)
+        sh = (np.mean(sample) / np.std(sample, ddof=1)) * np.sqrt(252)
+        bootstraps.append(sh)
 
-for ticker in tickers:
-    print(f"Running validation on {ticker}...")
-    try:
-        df = download_price_data([ticker], start_date, end_date)
-        price = df[ticker]
-        slope = get_slope(price)
-        accel = get_acceleration(price)
-        signals = generate_signals(slope, accel, entry_threshold, exit_threshold, use_acceleration=True)
-        result = backtest(price, signals)
-        perf = result["performance"]
+    p_value = np.mean([s >= obs_sharpe for s in bootstraps])
+    return obs_sharpe, p_value
+
+
+def regime_labels(price_series, ma_period=200):
+    """
+    Label each day as 'bull', 'sideways', or 'bear' based on 200-day trend.
+    """
+    trend = price_series.pct_change(ma_period)
+    regime = pd.cut(trend, bins=[-np.inf, -0.01, 0.01, np.inf], labels=["bear", "sideways", "bull"])
+    return regime.reindex(price_series.index)
+
+
+def regime_performance(price_series, signal_func, **kwargs):
+    """
+    Evaluate signal strategy performance by regime.
+    """
+    regime = regime_labels(price_series)
+    results = []
+
+    for r in ["bull", "sideways", "bear"]:
+        sub_idx = regime[regime == r].index
+        sub_prices = price_series.loc[sub_idx]
+
+        if len(sub_prices) < 252:
+            continue
+
+        sig = signal_func(sub_prices, **kwargs)
+        sh, ret, dd, trades, _ = evaluate_strategy(sub_prices, sig)
+
         results.append({
-            "Ticker": ticker,
-            "Sharpe Ratio": round(perf["Sharpe"], 2),
-            "Max Drawdown": f"{perf['Max Drawdown']:.0%}",
-            "Win Rate": f"{perf['Win Rate']:.0%}",
-            "Trades/Year": round(perf["Trade Frequency"], 1)
-        })
-    except Exception as e:
-        results.append({
-            "Ticker": ticker,
-            "Sharpe Ratio": "ERROR",
-            "Max Drawdown": "N/A",
-            "Win Rate": "N/A",
-            "Trades/Year": "N/A",
-            "Error": str(e)
+            "Regime": r,
+            "Sharpe": sh,
+            "Return": ret,
+            "Drawdown": dd,
+            "Trades": trades
         })
 
-df_results = pd.DataFrame(results)
-print("\n=== SKARRE SIGNAL STRATEGY VALIDATION ===")
-print(df_results.to_string(index=False))
+    return pd.DataFrame(results)
+
+
+def plot_comparison(price_series, signal_series, title="Strategy vs Buy & Hold"):
+    """
+    Plot strategy and benchmark cumulative returns.
+    """
+    returns = price_series.pct_change().fillna(0)
+    strat_returns = signal_series.shift(1) * returns
+    strat_returns = strat_returns.fillna(0)
+    cost_adj = strat_returns - 0.001  # Approximate penalty
+
+    cumulative_strat = (1 + cost_adj).cumprod()
+    cumulative_bh = (1 + returns).cumprod()
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(cumulative_strat, label='Skarre Strategy')
+    plt.plot(cumulative_bh, label='Buy & Hold', linestyle='--')
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
