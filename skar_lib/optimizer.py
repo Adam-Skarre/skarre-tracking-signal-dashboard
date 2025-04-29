@@ -1,59 +1,61 @@
+# optimizer.py
+
 import numpy as np
 import pandas as pd
-from .signal_logic import generate_signals
-from .backtester import backtest
+from signal_logic import generate_skarre_signal
+from backtester import evaluate_strategy
 
-
-def optimize_thresholds(
-    price_series: pd.Series,
-    slope_series: pd.Series,
-    accel_series: pd.Series = None,
-    entry_min: float = 0.0,
-    entry_max: float = 1.0,
-    exit_min: float = -1.0,
-    exit_max: float = 0.0,
-    step: float = 0.1,
-    use_acceleration: bool = False,
-    metric: str = 'Sharpe'
-) -> pd.DataFrame:
+def grid_search_optimizer(
+    price_series,
+    entry_slope_grid,
+    exit_slope_grid,
+    entry_sst_grid,
+    exit_sst_grid,
+    slope_window=5,
+    ma_window=20,
+    vol_window=20,
+    min_holding_days=5,
+    cost_params=None,
+):
     """
-    Perform a grid search over entry and exit thresholds to optimize a performance metric.
-
-    Returns a DataFrame with entry thresholds as index, exit thresholds as columns, and metric values.
-
-    Parameters:
-    - price_series: pd.Series of prices
-    - slope_series: pd.Series of slope values
-    - accel_series: pd.Series of acceleration values (optional)
-    - entry_min/entry_max: range for entry slope threshold
-    - exit_min/exit_max: range for exit slope threshold
-    - step: threshold increment
-    - use_acceleration: if True, include acceleration filter
-    - metric: performance metric to optimize (e.g. 'Sharpe', 'Max Drawdown')
+    Search best parameters across slope and SST thresholds.
+    Returns best Sharpe and associated parameter set.
     """
-    entry_vals = np.arange(entry_min, entry_max + step, step)
-    exit_vals = np.arange(exit_min, exit_max + step, step)
+    best_score = -np.inf
+    best_params = (0, 0, 0, 0)
+    results = []
 
-    results = pd.DataFrame(index=np.round(entry_vals, 4), columns=np.round(exit_vals, 4))
+    for es in entry_slope_grid:
+        for xs in exit_slope_grid:
+            for est in entry_sst_grid:
+                for xst in exit_sst_grid:
+                    sig = generate_skarre_signal(
+                        price_series,
+                        entry_slope_threshold=es,
+                        exit_slope_threshold=xs,
+                        entry_sst_threshold=est,
+                        exit_sst_threshold=xst,
+                        slope_window=slope_window,
+                        ma_window=ma_window,
+                        vol_window=vol_window,
+                        min_holding_days=min_holding_days
+                    )
+                    sharpe, ret, dd, trades, _ = evaluate_strategy(price_series, sig, cost_params)
 
-    for entry in entry_vals:
-        for exit_th in exit_vals:
-            signals = generate_signals(
-                slope_series, accel_series, entry, exit_th, use_acceleration
-            )
-            back = backtest(price_series, signals)
-            results.loc[np.round(entry, 4), np.round(exit_th, 4)] = back['performance'].get(metric, np.nan)
+                    results.append({
+                        "entry_slope": es,
+                        "exit_slope": xs,
+                        "entry_sst": est,
+                        "exit_sst": xst,
+                        "Sharpe": sharpe,
+                        "Return": ret,
+                        "Drawdown": dd,
+                        "Trades": trades
+                    })
 
-    return results.astype(float)
+                    if sharpe > best_score:
+                        best_score = sharpe
+                        best_params = (es, xs, est, xst)
 
-
-def get_optimal_thresholds(results_df: pd.DataFrame) -> tuple:
-    """
-    Identify the entry, exit pair that maximizes the metric in the results DataFrame.
-
-    Returns a tuple (entry_threshold, exit_threshold).
-    """
-    # Flatten and find max location
-    idx = results_df.stack()  # Series with MultiIndex
-    best = idx.idxmax()
-    return best  # (entry_val, exit_val)
+    result_df = pd.DataFrame(results).sort_values(by="Sharpe", ascending=False)
+    return best_params, best_score, result_df
