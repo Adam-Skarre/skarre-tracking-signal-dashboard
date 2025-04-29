@@ -12,11 +12,11 @@ import plotly.graph_objs as go
 from datetime import datetime
 
 # Now these will load from the same folder
-from polynomial_fit             import get_slope, get_acceleration
-from signal_logic               import generate_skarre_signal
-from backtester                 import backtest, evaluate_strategy
-from optimizer                  import grid_search_optimizer
-from validate_skarre_signal     import bootstrap_sharpe, regime_performance
+from skar_lib.polynomial_fit           import get_slope, get_acceleration
+from skar_lib.signal_logic             import generate_skarre_signal
+from skar_lib.backtester               import backtest, evaluate_strategy
+from skar_lib.optimizer                import grid_search_optimizer
+from skar_lib.validate_skarre_signal   import bootstrap_sharpe, regime_performance
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
