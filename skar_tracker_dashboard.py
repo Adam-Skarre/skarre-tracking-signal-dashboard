@@ -1,3 +1,9 @@
+# skar_tracker_dashboard.py
+
+import os, sys
+# ─ add this so Python finds your modules alongside this script ─
+sys.path.insert(0, os.path.dirname(__file__))
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -5,9 +11,14 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
-from skar_lib.polynomial_fit   import get_slope, get_acceleration
-from skar_lib.signal_logic     import generate_skarre_signal
-from skar_lib.backtester       import backtest, evaluate_strategy
+# now import from your local .py files
+from polynomial_fit           import get_slope, get_acceleration
+from signal_logic             import generate_skarre_signal
+from backtester               import backtest, evaluate_strategy
+from optimizer                import grid_search_optimizer
+from validate_skarre_signal   import bootstrap_sharpe, regime_performance
+
+
 
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
 
