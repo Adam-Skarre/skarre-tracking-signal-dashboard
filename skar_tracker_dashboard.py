@@ -47,7 +47,7 @@ page = st.sidebar.radio("Select View", [
 
 # === About ===
 if page == "About":
-    st.title("🔎 About Skarre Tracker")
+    st.title("About Skarre Tracker")
     st.markdown("""
     **Skarre Tracker v2.0** is a research-grade trading dashboard:
     - **Slope (1st derivative)** and **Acceleration (2nd derivative)** signals
@@ -136,7 +136,7 @@ elif page == "Live Signal Tracker":
 
 # === Derivative Diagnostics ===
 elif page == "Derivative Diagnostics":
-    st.title("⚙️ Derivative Diagnostics")
+    st.title("Derivative Diagnostics")
     st.markdown("Inspect slope & acceleration distributions before trading.")
 
     ticker2    = st.sidebar.text_input("Ticker", "SPY", key="diag_ticker").upper()
@@ -158,7 +158,7 @@ elif page == "Derivative Diagnostics":
 
 # === Polynomial Fit Curve ===
 elif page == "Polynomial Fit Curve":
-    st.title("🔧 Polynomial Fit Curve")
+    st.title("Polynomial Fit Curve")
     st.markdown("Fit a rolling 2nd-degree polynomial to price data.")
 
     ticker_pf = st.sidebar.text_input("Ticker", "SPY", key="pf_ticker").upper()
@@ -203,7 +203,7 @@ elif page == "Derivative Histograms":
 
 # === Threshold Optimization ===
 elif page == "Threshold Optimization":
-    st.title("🌡️ Threshold Optimization")
+    st.title("Threshold Optimization")
     st.markdown("Heatmap of Sharpe ratio over slope & SST thresholds for SPY (2022–2024).")
 
     price_opt = get_data("SPY", "2022-01-01", "2024-12-31")['Price']
@@ -219,13 +219,18 @@ elif page == "Threshold Optimization":
     )
 
     st.write(f"**Best Params:** slope_in={best[0]}, slope_out={best[1]}, sst_in={best[2]}, sst_out={best[3]}  → Sharpe {best_sh:.2f}")
-    heatmap = df_opt.pivot("entry_slope","exit_sst","Sharpe")
+    heatmap = df_opt.pivot_table(
+    index="entry_slope",
+    columns="exit_sst",
+    values="Sharpe",
+    aggfunc="mean"
+)
     st.dataframe(heatmap.style.background_gradient(axis=None))
     st.caption("Green = better risk-adjusted performance")
 
 # === Strategy Performance ===
 elif page == "Strategy Performance":
-    st.title("🚀 Strategy Performance")
+    st.title("Strategy Performance")
     st.markdown("Equity curve comparison & regime analysis for SPY (2022–2024).")
 
     df_sp = get_data("SPY", "2022-01-01", "2024-12-31")['Price']
@@ -262,7 +267,7 @@ elif page == "Strategy Performance":
 
 # === Trade Log ===
 elif page == "Trade Log":
-    st.title("🗒️ Trade Log")
+    st.title("Trade Log")
     st.markdown("Detailed list of executed trades for SPY.")
 
     df_tl = get_data("SPY", "2022-01-01", "2024-12-31")['Price']
