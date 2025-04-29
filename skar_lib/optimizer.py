@@ -1,28 +1,26 @@
-# optimizer.py
-
 import numpy as np
 import pandas as pd
 from signal_logic import generate_skarre_signal
-from backtester import evaluate_strategy
+from backtester    import evaluate_strategy
 
 def grid_search_optimizer(
-    price_series,
-    entry_slope_grid,
-    exit_slope_grid,
-    entry_sst_grid,
-    exit_sst_grid,
-    slope_window=5,
-    ma_window=20,
-    vol_window=20,
-    min_holding_days=5,
-    cost_params=None,
-):
+    price_series: pd.Series,
+    entry_slope_grid: list,
+    exit_slope_grid: list,
+    entry_sst_grid: list,
+    exit_sst_grid: list,
+    slope_window: int = 5,
+    ma_window: int = 20,
+    vol_window: int = 20,
+    min_holding_days: int = 5,
+    cost_params: dict = None
+) -> tuple:
     """
-    Search best parameters across slope and SST thresholds.
-    Returns best Sharpe and associated parameter set.
+    Performs a 4D grid search over entry/exit slope and entry/exit SST.
+    Returns: (best_params, best_sharpe, results_df)
     """
-    best_score = -np.inf
-    best_params = (0, 0, 0, 0)
+    best_sharpe = -np.inf
+    best_params = None
     results = []
 
     for es in entry_slope_grid:
@@ -40,7 +38,9 @@ def grid_search_optimizer(
                         vol_window=vol_window,
                         min_holding_days=min_holding_days
                     )
-                    sharpe, ret, dd, trades, _ = evaluate_strategy(price_series, sig, cost_params)
+                    sharpe, r, dd, tr, _ = evaluate_strategy(
+                        price_series, sig, cost_params
+                    )
 
                     results.append({
                         "entry_slope": es,
@@ -48,14 +48,14 @@ def grid_search_optimizer(
                         "entry_sst": est,
                         "exit_sst": xst,
                         "Sharpe": sharpe,
-                        "Return": ret,
+                        "Return": r,
                         "Drawdown": dd,
-                        "Trades": trades
+                        "Trades": tr
                     })
 
-                    if sharpe > best_score:
-                        best_score = sharpe
+                    if sharpe > best_sharpe:
+                        best_sharpe = sharpe
                         best_params = (es, xs, est, xst)
 
-    result_df = pd.DataFrame(results).sort_values(by="Sharpe", ascending=False)
-    return best_params, best_score, result_df
+    df = pd.DataFrame(results).sort_values("Sharpe", ascending=False)
+    return best_params, best_sharpe, df
