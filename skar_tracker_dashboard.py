@@ -78,14 +78,25 @@ elif page == "Live Signal Tracker":
     holding_days = st.sidebar.slider("Min. Holding Days",       1,   20,   5, key="live_holding_days")
     show_pts     = st.sidebar.checkbox("Show Buy/Sell Markers", True, key="live_show_markers")
 
-         # DEBUG: inspect inputs & fetched data
+      # LIVE SIGNAL TRACKER
+    if page == "Live Signal Tracker":
+        st.title("Live Signal Tracker")
+
+        ticker     = st.sidebar.text_input("Enter Ticker Symbol", value="SPY").upper()
+        start_date = st.sidebar.date_input("Start Date", datetime(2022, 1, 1))
+        end_date   = st.sidebar.date_input("End Date",   datetime(2024, 12, 31))
+
+        # <-- DEBUG BLOCK (must align with the 4-space indent under the if) -->
         st.write("🔍 Debug — ticker, start, end:", ticker, start_date, end_date)
         price_df = get_data(ticker, start_date, end_date)
         st.write("📊 Debug — rows fetched:", price_df.shape[0])
-        st.write(price_df.head(3), price_df.tail(3))
+        st.write(price_df.head(3))
+        st.write(price_df.tail(3))
         if price_df.empty:
             st.warning(f"No data found for {ticker} from {start_date} to {end_date}.")
             st.stop()
+
+        # … rest of your Live Signal Tracker code …
 
     price_series = df['Price']
     slope  = get_slope(price_series)
