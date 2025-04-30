@@ -1,3 +1,10 @@
+import os
+import sys
+# Ensure the project root is on PYTHONPATH so we can import skar_lib
+root = os.path.abspath(os.path.dirname(__file__))
+if root not in sys.path:
+    sys.path.insert(0, root)
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -5,6 +12,7 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
+# Now safe to import from skar_lib
 from skar_lib.polynomial_fit import get_slope, get_acceleration
 from skar_lib.signal_logic import generate_signals
 from skar_lib.backtester import backtest
