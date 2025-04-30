@@ -3,7 +3,7 @@ from backtester import run_backtest  # your existing backtester entry-point
 from typing import Callable, List, Dict
 
 def run_walkforward(
-    price: pd.Series,
+    price: pd.Series, 
     signal_fn: Callable[[pd.Series], pd.Series],
     train_window: int,
     test_window: int,
