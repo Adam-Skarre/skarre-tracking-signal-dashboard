@@ -1,10 +1,9 @@
 import os
 import sys
-# Add parent directory to PYTHONPATH for skar_lib imports
-dir_here = os.path.abspath(os.path.dirname(__file__))
-parent_dir = os.path.abspath(os.path.join(dir_here, os.pardir))
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+# Ensure the current directory (project root) is on PYTHONPATH
+this_dir = os.path.abspath(os.path.dirname(__file__))
+if this_dir not in sys.path:
+    sys.path.insert(0, this_dir)
 
 import streamlit as st
 import yfinance as yf
@@ -13,7 +12,7 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
-# Now safe to import from skar_lib
+# Imports from skar_lib package
 from skar_lib.polynomial_fit import get_slope, get_acceleration
 from skar_lib.signal_logic import generate_signals
 from skar_lib.backtester import backtest
@@ -83,31 +82,26 @@ elif page == "Backtest V1":
 # "Plot Signals" page
 elif page == "Plot Signals":
     st.header("Signal vs Price Plot")
-    # TODO: Add original Plot Signals logic here
     st.info("Plot Signals module coming soon.")
 
 # "Metrics Summary" page
 elif page == "Metrics Summary":
     st.header("Metrics Summary")
-    # TODO: Add metrics summary logic here
     st.info("Metrics Summary module coming soon.")
 
 # "Optimization" page
 elif page == "Optimization":
     st.header("Parameter Optimization")
-    # TODO: Add optimization logic here
     st.info("Optimization module coming soon.")
 
 # "Validation" page
 elif page == "Validation":
     st.header("Signal Validation")
-    # TODO: Add validate_skarre_signal logic here
     st.info("Validation module coming soon.")
 
 # "Plots" page
 elif page == "Plots":
     st.header("Additional Plots")
-    # TODO: Add extra plots logic here
     st.info("Additional Plots module coming soon.")
 
 # "Walk-Forward" page (V3)
@@ -134,7 +128,6 @@ elif page == "Walk-Forward":
 # "Dashboard" page
 elif page == "Dashboard":
     st.header("Comprehensive Dashboard")
-    # TODO: Add comprehensive dashboard aggregation
     st.info("Dashboard module coming soon.")
 
 # "Trade Log (SPY Example)" page
