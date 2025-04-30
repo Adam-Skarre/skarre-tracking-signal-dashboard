@@ -1,81 +1,84 @@
-# validate_skarre_signal.py
-
 import numpy as np
 import pandas as pd
-from signal_logic import generate_skarre_signal
-from backtester import evaluate_strategy
-import matplotlib.pyplot as plt
+from backtester import backtest
 
-def bootstrap_sharpe(returns, n_bootstrap=10000):
+
+def bootstrap_sharpe(
+    price: pd.Series,
+    signal: pd.Series,
+    n_boot: int = 1000,
+    block_size: int = 20,
+    cost: pd.Series = None,
+    pos_size: pd.Series = None
+) -> (float, float):
     """
-    Returns observed Sharpe ratio and p-value from bootstrap sampling.
+    Compute observed Sharpe and p-value under null by block bootstrap of returns.
+
+    Returns:
+    - observed_sharpe, p_value
     """
-    returns = returns.dropna()
-    obs_sharpe = (returns.mean() / returns.std(ddof=1)) * np.sqrt(252)
+    # Full backtest to get observed Sharpe
+    df, perf = backtest(price, signal, cost, pos_size)
+    obs_sharpe = perf['Sharpe']
 
-    bootstraps = []
-    for _ in range(n_bootstrap):
-        sample = np.random.choice(returns, size=len(returns), replace=True)
-        sh = (np.mean(sample) / np.std(sample, ddof=1)) * np.sqrt(252)
-        bootstraps.append(sh)
+    # Calculate strategy returns
+    strat_ret = df['Return']
 
-    p_value = np.mean([s >= obs_sharpe for s in bootstraps])
+    # Block bootstrap p-value
+    n = len(strat_ret)
+    boot_sharpes = []
+    for _ in range(n_boot):
+        # sample start index for block
+        starts = np.random.randint(0, n-block_size, size=int(np.ceil(n/block_size)))
+        resampled = []
+        for s in starts:
+            resampled.extend(strat_ret.values[s:s+block_size])
+            if len(resampled) >= n:
+                break
+        resampled = np.array(resampled[:n])
+        # compute Sharpe
+        sr = np.nan
+        if np.std(resampled, ddof=1) > 0:
+            sr = np.mean(resampled)/np.std(resampled, ddof=1)*np.sqrt(252)
+        boot_sharpes.append(sr)
+    boot_sharpes = np.array(boot_sharpes)
+
+    # p-value: fraction of boot Sharpe >= obs if obs>0, else <= obs
+    if obs_sharpe >= 0:
+        p_value = np.mean(boot_sharpes >= obs_sharpe)
+    else:
+        p_value = np.mean(boot_sharpes <= obs_sharpe)
+
     return obs_sharpe, p_value
 
 
-def regime_labels(price_series, ma_period=200):
+def regime_performance(
+    price: pd.Series,
+    signal: pd.Series,
+    slope: pd.Series
+) -> pd.DataFrame:
     """
-    Label each day as 'bull', 'sideways', or 'bear' based on 200-day trend.
+    Split performance into bull/bear regimes based on slope >0.
+
+    Returns a DataFrame with index ['bull','bear'] and columns ['Sharpe','Total Return','Max Drawdown'].
     """
-    trend = price_series.pct_change(ma_period)
-    regime = pd.cut(trend, bins=[-np.inf, -0.01, 0.01, np.inf], labels=["bear", "sideways", "bull"])
-    return regime.reindex(price_series.index)
+    # Define regimes
+    bull = slope > 0
+    bear = ~bull
 
-
-def regime_performance(price_series, signal_func, **kwargs):
-    """
-    Evaluate signal strategy performance by regime.
-    """
-    regime = regime_labels(price_series)
-    results = []
-
-    for r in ["bull", "sideways", "bear"]:
-        sub_idx = regime[regime == r].index
-        sub_prices = price_series.loc[sub_idx]
-
-        if len(sub_prices) < 252:
+    results = {}
+    for name, mask in [('bull', bull), ('bear', bear)]:
+        # filter price+signal
+        pr = price[mask]
+        sg = signal[mask]
+        if len(pr) < 2:
+            # insufficient data
+            results[name] = {'Sharpe': np.nan, 'Total Return': np.nan, 'Max Drawdown': np.nan}
             continue
-
-        sig = signal_func(sub_prices, **kwargs)
-        sh, ret, dd, trades, _ = evaluate_strategy(sub_prices, sig)
-
-        results.append({
-            "Regime": r,
-            "Sharpe": sh,
-            "Return": ret,
-            "Drawdown": dd,
-            "Trades": trades
-        })
-
-    return pd.DataFrame(results)
-
-
-def plot_comparison(price_series, signal_series, title="Strategy vs Buy & Hold"):
-    """
-    Plot strategy and benchmark cumulative returns.
-    """
-    returns = price_series.pct_change().fillna(0)
-    strat_returns = signal_series.shift(1) * returns
-    strat_returns = strat_returns.fillna(0)
-    cost_adj = strat_returns - 0.001  # Approximate penalty
-
-    cumulative_strat = (1 + cost_adj).cumprod()
-    cumulative_bh = (1 + returns).cumprod()
-
-    plt.figure(figsize=(10, 5))
-    plt.plot(cumulative_strat, label='Skarre Strategy')
-    plt.plot(cumulative_bh, label='Buy & Hold', linestyle='--')
-    plt.title(title)
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+        df, perf = backtest(pr, sg)
+        results[name] = {
+            'Sharpe': perf['Sharpe'],
+            'Total Return': perf['Total Return'],
+            'Max Drawdown': perf['Max Drawdown']
+        }
+    return pd.DataFrame(results).T
