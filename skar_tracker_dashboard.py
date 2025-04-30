@@ -25,10 +25,15 @@ st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
 
 @st.cache_data(show_spinner=False)
 def get_data(ticker, start, end):
-    """
-    Fetch Adjusted Close price for ticker between start/end dates.
-    """
-    df = yf.download(ticker, start=start, end=end, progress=False)[['Close']].dropna()
+    # Cap end at today’s date
+    today = datetime.today().date()
+    if end >= today:
+        end = today
+    # Make end inclusive by adding one day for yfinance
+    yf_end = end + timedelta(days=1)
+
+    df = yf.download(ticker, start=start, end=yf_end, progress=False)
+    df = df[['Close']].dropna()
     df.columns = ['Price']
     return df
 
