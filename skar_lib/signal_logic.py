@@ -1,66 +1,64 @@
 import pandas as pd
 import numpy as np
 
-def get_slope(prices: pd.Series, window: int = 5) -> pd.Series:
-    """
-    1st derivative (momentum) via rolling linear fit.
-    """
-    return prices.diff().rolling(window).mean().fillna(0)
 
-def get_acceleration(prices: pd.Series, window: int = 5) -> pd.Series:
-    """
-    2nd derivative: change of slope.
-    """
-    slope = get_slope(prices, window)
-    return slope.diff().fillna(0)
-
-def generate_skarre_signal(
-    price_series: pd.Series,
-    entry_slope_threshold: float,
-    exit_slope_threshold: float,
-    entry_sst_threshold: float,
-    exit_sst_threshold: float,
-    slope_window: int = 5,
-    ma_window: int = 20,
+def generate_signals(
+    slope: pd.Series,
+    accel: pd.Series,
+    entry_slope: float,
+    exit_slope: float,
+    use_sst: bool = False,
+    price: pd.Series = None,
+    ma_window: int = 50,
     vol_window: int = 20,
-    min_holding_days: int = 1
+    min_holding_days: int = 3
 ) -> pd.Series:
     """
-    Combined slope + SST signal.
-    SST = (price - rolling MA) / rolling volatility.
+    Generate long/flat trading signals based on slope, acceleration, and optional SST.
+
+    Parameters:
+    - slope: pd.Series of first derivatives
+    - accel: pd.Series of second derivatives (unused if use_sst)
+    - entry_slope: threshold to enter a long position
+    - exit_slope: threshold to exit a long position
+    - use_sst: whether to use SST = (price - MA)/volatility instead of raw slope
+    - price: pd.Series of prices (required if use_sst=True)
+    - ma_window: lookback window for moving average in SST
+    - vol_window: lookback window for volatility in SST
+    - min_holding_days: minimum bars to hold a position
+
+    Returns:
+    - pd.Series of 0 (flat) or 1 (long) signals
     """
-    # Derivatives
-    slope = get_slope(price_series, slope_window)
-    accel = get_acceleration(price_series, slope_window)
+    if use_sst and price is None:
+        raise ValueError("price series must be provided when use_sst=True")
 
-    # SST
-    ma  = price_series.rolling(ma_window).mean()
-    vol = price_series.pct_change().rolling(vol_window).std().fillna(price_series.pct_change().std())
-    sst = ((price_series - ma) / vol).fillna(0)
+    # Precompute SST if needed
+    if use_sst:
+        ma = price.rolling(window=ma_window).mean()
+        vol = price.pct_change().rolling(window=vol_window).std().replace(0, np.nan)
+        sst = (price - ma) / vol
+        entry_signal = sst > entry_slope
+        exit_signal  = sst < exit_slope
+    else:
+        entry_signal = slope > entry_slope
+        exit_signal  = slope < exit_slope
 
-    # Generate positions
-    positions = pd.Series(0, index=price_series.index)
-    pos = 0
-    last_change = None
+    # Initialize signal series
+    signal = pd.Series(0, index=slope.index, dtype=int)
+    position = 0
+    hold_count = 0
 
-    for idx in price_series.index:
-        if last_change is None:
-            held = min_holding_days
+    for t in slope.index:
+        if position == 0:
+            if entry_signal.loc[t]:
+                position = 1
+                hold_count = 1
         else:
-            held = (idx - last_change).days
+            hold_count += 1
+            if exit_signal.loc[t] and hold_count >= min_holding_days:
+                position = 0
+                hold_count = 0
+        signal.loc[t] = position
 
-        cslope = slope.loc[idx]
-        csst   = sst.loc[idx]
-
-        # Entry
-        if pos == 0 and cslope > entry_slope_threshold and csst > entry_sst_threshold and held >= min_holding_days:
-            pos = 1
-            last_change = idx
-        # Exit
-        elif pos == 1 and (cslope < exit_slope_threshold or csst < exit_sst_threshold) and held >= min_holding_days:
-            pos = 0
-            last_change = idx
-
-        positions.loc[idx] = pos
-
-    return positions
+    return signal
