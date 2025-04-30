@@ -129,20 +129,25 @@ elif page == "About":
     comparison_df = pd.DataFrame({
         "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
     
-# --- right before your dict starts ---
-final_equity = (
-    result['trade_log']['Equity'].iloc[-1]
-    if not result['trade_log'].empty
-    else 1.0
-)
+# Safely extract final equity (avoids indexing empty DataFrame)
+trade_log = result["trade_log"]
+if not trade_log.empty:
+    final_equity = trade_log["Equity"].iloc[-1]
+else:
+    final_equity = 1.0
 
-# --- now your dict or list of metrics --- 
+# Build your metrics table
 table_data = {
-    "Strategy": ["Skarre Signal"],
-    "Performance": [
-        f"{(final_equity - 1) * 100:.1f}%"
+    "Skarre Signal": [
+        f"{(final_equity - 1) * 100:.1f}%",
+        f"{result['metrics']['sharpe']:.2f}",
+        f"{result['metrics']['max_drawdown'] * 100:.0f}%",
+        f"{(result['metrics'].get('win_rate', 0) * 100):.0f}%",
+        f"{result['metrics']['trade_frequency']:.1f}"
     ]
 }
+
+st.table(table_data)
 st.table(table_data)
 "Skarre Signal": [
     f"{(final_equity - 1) * 100:.1f}%",
