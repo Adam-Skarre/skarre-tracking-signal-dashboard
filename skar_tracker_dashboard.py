@@ -1,10 +1,9 @@
 import os
 import sys
-# PYTHONPATH hack: add project root so skar_lib package is importable
-import os, sys
-ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
+# Add project root to PYTHONPATH for skar_lib imports
+file_dir = os.path.abspath(os.path.dirname(__file__))
+if file_dir not in sys.path:
+    sys.path.insert(0, file_dir)
 
 import streamlit as st
 import yfinance as yf
@@ -13,17 +12,6 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
-# Imports from skar_lib package
-from skar_lib.polynomial_fit import get_slope, get_acceleration
-from skar_lib.signal_logic import generate_signals
-from skar_lib.backtester import backtest
-from skar_lib.data_loader import get_data
-from skar_lib.walkforward import run_walkforward
-from polynomial_fit import get_slope, get_acceleration
-from signal_logic import generate_signals
-from backtester import backtest
-from data_loader import get_data
-from walkforward import run_walkforward
 from skar_lib.polynomial_fit import get_slope, get_acceleration
 from skar_lib.signal_logic import generate_signals
 from skar_lib.backtester import backtest
@@ -32,7 +20,6 @@ from skar_lib.walkforward import run_walkforward
 
 st.set_page_config(page_title="Skarre Tracker Dashboard V3", layout="wide")
 
-# Sidebar navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Select View", [
     "About",
@@ -48,14 +35,10 @@ page = st.sidebar.radio("Select View", [
     "Trade Log (SPY Example)"
 ])
 
-# "About" page
 if page == "About":
     st.title("🚀 Skarre Tracker Dashboard V3")
-    st.markdown(
-        "This dashboard provides signal generation, backtesting, and now walk-forward testing for robust validation."
-    )
+    st.markdown("This dashboard provides signal generation, backtesting, and now walk-forward testing for robust validation.")
 
-# "Live Signal" page
 elif page == "Live Signal":
     st.header("Live Signal Generation")
     tick = st.sidebar.text_input("Ticker", "SPY")
@@ -68,12 +51,9 @@ elif page == "Live Signal":
     entry = st.sidebar.number_input("Entry Threshold", value=0.5)
     exit_ = st.sidebar.number_input("Exit Threshold", value=-0.5)
     use_acc = st.sidebar.checkbox("Use Acceleration", True)
-    signals = generate_signals(
-        slope, accel, entry, exit_, use_acceleration=use_acc
-    )
+    signals = generate_signals(slope, accel, entry, exit_, use_acceleration=use_acc)
     st.line_chart(signals)
 
-# "Backtest V1" page
 elif page == "Backtest V1":
     st.header("Backtest V1: Skarre Signal")
     tick = st.sidebar.text_input("Ticker", "SPY")
@@ -90,32 +70,26 @@ elif page == "Backtest V1":
     st.write("**Performance Metrics**")
     st.json(result.get("metrics", {}))
 
-# "Plot Signals" page
 elif page == "Plot Signals":
     st.header("Signal vs Price Plot")
     st.info("Plot Signals module coming soon.")
 
-# "Metrics Summary" page
 elif page == "Metrics Summary":
     st.header("Metrics Summary")
     st.info("Metrics Summary module coming soon.")
 
-# "Optimization" page
 elif page == "Optimization":
     st.header("Parameter Optimization")
     st.info("Optimization module coming soon.")
 
-# "Validation" page
 elif page == "Validation":
     st.header("Signal Validation")
     st.info("Validation module coming soon.")
 
-# "Plots" page
 elif page == "Plots":
     st.header("Additional Plots")
     st.info("Additional Plots module coming soon.")
 
-# "Walk-Forward" page (V3)
 elif page == "Walk-Forward":
     st.header("Walk-Forward Testing")
     tick = st.sidebar.text_input("Ticker", "SPY")
@@ -136,12 +110,10 @@ elif page == "Walk-Forward":
     if not df_fw.empty:
         st.line_chart(df_fw[["return","sharpe","max_drawdown"]])
 
-# "Dashboard" page
 elif page == "Dashboard":
     st.header("Comprehensive Dashboard")
     st.info("Dashboard module coming soon.")
 
-# "Trade Log (SPY Example)" page
 elif page == "Trade Log (SPY Example)":
     st.header("Trade Log (SPY Example)")
     price_series = get_data("SPY", "2022-01-01", "2024-12-31")["Price"]
