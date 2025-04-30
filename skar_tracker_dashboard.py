@@ -78,11 +78,14 @@ elif page == "Live Signal Tracker":
     holding_days = st.sidebar.slider("Min. Holding Days",       1,   20,   5, key="live_holding_days")
     show_pts     = st.sidebar.checkbox("Show Buy/Sell Markers", True, key="live_show_markers")
 
-    # Load data
-    df = get_data(ticker, start_date, end_date)
-    if df.empty:
-        st.warning("No data found for that ticker/date range.")
-        st.stop()
+         # DEBUG: inspect inputs & fetched data
+        st.write("🔍 Debug — ticker, start, end:", ticker, start_date, end_date)
+        price_df = get_data(ticker, start_date, end_date)
+        st.write("📊 Debug — rows fetched:", price_df.shape[0])
+        st.write(price_df.head(3), price_df.tail(3))
+        if price_df.empty:
+            st.warning(f"No data found for {ticker} from {start_date} to {end_date}.")
+            st.stop()
 
     price_series = df['Price']
     slope  = get_slope(price_series)
