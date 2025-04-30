@@ -25,17 +25,24 @@ st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
 
 @st.cache_data(show_spinner=False)
 def get_data(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFrame:
-    # 1) Download full history
-    raw = yf.download(ticker, progress=False)
+    # 1) Download full history with explicit start/end
+    yf_end = pd.Timestamp(end) + pd.Timedelta(days=1)
+    raw = yf.download(ticker, start=pd.Timestamp(start), end=yf_end, progress=False)
+    
+    # DEBUG: see what raw looks like
+    st.write("raw download rows:", raw.shape[0])
+    
     if raw.empty:
         return pd.DataFrame(columns=["Price"])
-    # 2) Keep and rename Close→Price
-    df = raw[["Close"]].dropna().rename(columns={"Close": "Price"})
-    # 3) Build inclusive timestamp bounds
+    
+    df = raw[["Close"]].rename(columns={"Close":"Price"})
+    
+    # 2) Filter inclusive by start/end
     ts_start = pd.Timestamp(start)
     ts_end   = pd.Timestamp(end) + pd.Timedelta(days=1)
-    # 4) Filter the DataFrame by those timestamps
     df = df.loc[(df.index >= ts_start) & (df.index < ts_end)]
+    
+    st.write("filtered rows:", df.shape[0])
     return df
 
 # Sidebar navigation
