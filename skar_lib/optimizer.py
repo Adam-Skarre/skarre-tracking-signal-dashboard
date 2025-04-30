@@ -1,73 +1,59 @@
+import numpy as np
 import pandas as pd
-from backtester import backtest
-from signal_logic import generate_signals
+from .signal_logic import generate_signals
+from .backtester import backtest
 
 
-def grid_search_optimizer(
-    price: pd.Series,
-    slope: pd.Series,
-    accel: pd.Series,
-    entry_range: list,
-    exit_range: list,
-    use_sst: bool = False,
-    ma_window: int = 50,
-    vol_window: int = 20,
-    min_holding_days: int = 3,
-    cost_series: pd.Series = None,
-    pos_size_series: pd.Series = None
-) -> (tuple, pd.DataFrame):
+def optimize_thresholds(
+    price_series: pd.Series,
+    slope_series: pd.Series,
+    accel_series: pd.Series = None,
+    entry_min: float = 0.0,
+    entry_max: float = 1.0,
+    exit_min: float = -1.0,
+    exit_max: float = 0.0,
+    step: float = 0.1,
+    use_acceleration: bool = False,
+    metric: str = 'Sharpe'
+) -> pd.DataFrame:
     """
-    Perform grid search over entry and exit thresholds to maximize Sharpe ratio.
+    Perform a grid search over entry and exit thresholds to optimize a performance metric.
+
+    Returns a DataFrame with entry thresholds as index, exit thresholds as columns, and metric values.
 
     Parameters:
-    - price: pd.Series of prices
-    - slope: pd.Series of first derivative
-    - accel: pd.Series of second derivative
-    - entry_range: sequence of entry threshold values
-    - exit_range: sequence of exit threshold values
-    - use_sst: flag to use SST logic instead of raw slope
-    - ma_window, vol_window: parameters for SST
-    - min_holding_days: minimum holding period for signals
-    - cost_series: pd.Series of transaction costs (optional)
-    - pos_size_series: pd.Series of position sizes (optional)
-
-    Returns:
-    - best_params: (entry_threshold, exit_threshold, Sharpe)
-    - results_df: pd.DataFrame with columns ['entry', 'exit', 'Sharpe', 'Total Return', 'Max Drawdown']
+    - price_series: pd.Series of prices
+    - slope_series: pd.Series of slope values
+    - accel_series: pd.Series of acceleration values (optional)
+    - entry_min/entry_max: range for entry slope threshold
+    - exit_min/exit_max: range for exit slope threshold
+    - step: threshold increment
+    - use_acceleration: if True, include acceleration filter
+    - metric: performance metric to optimize (e.g. 'Sharpe', 'Max Drawdown')
     """
-    records = []
-    for entry in entry_range:
-        for exit in exit_range:
-            # generate signals
+    entry_vals = np.arange(entry_min, entry_max + step, step)
+    exit_vals = np.arange(exit_min, exit_max + step, step)
+
+    results = pd.DataFrame(index=np.round(entry_vals, 4), columns=np.round(exit_vals, 4))
+
+    for entry in entry_vals:
+        for exit_th in exit_vals:
             signals = generate_signals(
-                slope=slope,
-                accel=accel,
-                entry_slope=entry,
-                exit_slope=exit,
-                use_sst=use_sst,
-                price=price,
-                ma_window=ma_window,
-                vol_window=vol_window,
-                min_holding_days=min_holding_days
+                slope_series, accel_series, entry, exit_th, use_acceleration
             )
-            # backtest
-            df, perf = backtest(
-                price=price,
-                signal=signals,
-                cost=cost_series,
-                pos_size=pos_size_series
-            )
-            records.append({
-                'entry': entry,
-                'exit': exit,
-                'Sharpe': perf['Sharpe'],
-                'Total Return': perf['Total Return'],
-                'Max Drawdown': perf['Max Drawdown']
-            })
-    results_df = pd.DataFrame.from_records(records)
-    # drop nan Sharpe
-    results_df = results_df.dropna(subset=['Sharpe'])
-    # find best Sharpe
-    best = results_df.loc[results_df['Sharpe'].idxmax()]
-    best_params = (best['entry'], best['exit'], best['Sharpe'])
-    return best_params, results_df
+            back = backtest(price_series, signals)
+            results.loc[np.round(entry, 4), np.round(exit_th, 4)] = back['performance'].get(metric, np.nan)
+
+    return results.astype(float)
+
+
+def get_optimal_thresholds(results_df: pd.DataFrame) -> tuple:
+    """
+    Identify the entry, exit pair that maximizes the metric in the results DataFrame.
+
+    Returns a tuple (entry_threshold, exit_threshold).
+    """
+    # Flatten and find max location
+    idx = results_df.stack()  # Series with MultiIndex
+    best = idx.idxmax()
+    return best  # (entry_val, exit_val)
