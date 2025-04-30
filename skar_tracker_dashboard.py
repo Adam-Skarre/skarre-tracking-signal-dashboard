@@ -1,9 +1,10 @@
 import os
 import sys
-# Ensure the project root is on PYTHONPATH so we can import skar_lib
-root = os.path.abspath(os.path.dirname(__file__))
-if root not in sys.path:
-    sys.path.insert(0, root)
+# Add parent directory to PYTHONPATH for skar_lib imports
+dir_here = os.path.abspath(os.path.dirname(__file__))
+parent_dir = os.path.abspath(os.path.join(dir_here, os.pardir))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 import streamlit as st
 import yfinance as yf
@@ -82,32 +83,32 @@ elif page == "Backtest V1":
 # "Plot Signals" page
 elif page == "Plot Signals":
     st.header("Signal vs Price Plot")
-    # original Plot Signals code here...
-    pass
+    # TODO: Add original Plot Signals logic here
+    st.info("Plot Signals module coming soon.")
 
 # "Metrics Summary" page
 elif page == "Metrics Summary":
     st.header("Metrics Summary")
-    # original metrics summary code here...
-    pass
+    # TODO: Add metrics summary logic here
+    st.info("Metrics Summary module coming soon.")
 
 # "Optimization" page
 elif page == "Optimization":
     st.header("Parameter Optimization")
-    # original optimizer UI and logic here...
-    pass
+    # TODO: Add optimization logic here
+    st.info("Optimization module coming soon.")
 
 # "Validation" page
 elif page == "Validation":
     st.header("Signal Validation")
-    # original validate_skarre_signal logic here...
-    pass
+    # TODO: Add validate_skarre_signal logic here
+    st.info("Validation module coming soon.")
 
 # "Plots" page
 elif page == "Plots":
     st.header("Additional Plots")
-    # original plots code here...
-    pass
+    # TODO: Add extra plots logic here
+    st.info("Additional Plots module coming soon.")
 
 # "Walk-Forward" page (V3)
 elif page == "Walk-Forward":
@@ -133,8 +134,8 @@ elif page == "Walk-Forward":
 # "Dashboard" page
 elif page == "Dashboard":
     st.header("Comprehensive Dashboard")
-    # original dashboard aggregation and plots here...
-    pass
+    # TODO: Add comprehensive dashboard aggregation
+    st.info("Dashboard module coming soon.")
 
 # "Trade Log (SPY Example)" page
 elif page == "Trade Log (SPY Example)":
