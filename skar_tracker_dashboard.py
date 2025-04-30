@@ -1,9 +1,10 @@
 import os
 import sys
-# Ensure the current directory (project root) is on PYTHONPATH
-this_dir = os.path.abspath(os.path.dirname(__file__))
-if this_dir not in sys.path:
-    sys.path.insert(0, this_dir)
+# Add skar_lib folder to PYTHONPATH for direct module imports
+base_dir = os.path.abspath(os.path.dirname(__file__))
+lib_path = os.path.join(base_dir, "skar_lib")
+if lib_path not in sys.path:
+    sys.path.insert(0, lib_path)
 
 import streamlit as st
 import yfinance as yf
@@ -12,7 +13,12 @@ import numpy as np
 import plotly.graph_objs as go
 from datetime import datetime
 
-# Imports from skar_lib package
+# Direct imports from skar_lib modules
+from polynomial_fit import get_slope, get_acceleration
+from signal_logic import generate_signals
+from backtester import backtest
+from data_loader import get_data
+from walkforward import run_walkforward
 from skar_lib.polynomial_fit import get_slope, get_acceleration
 from skar_lib.signal_logic import generate_signals
 from skar_lib.backtester import backtest
