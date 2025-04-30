@@ -1,66 +1,59 @@
 import pandas as pd
 import numpy as np
 
-
-def backtest(
-    price: pd.Series,
-    signal: pd.Series,
-    cost: pd.Series = None,
-    pos_size: pd.Series = None
-) -> (pd.DataFrame, dict):
+def backtest(price_series, positions):
     """
-    Run a backtest of the given signal on price data.
-
-    Parameters:
-    - price: pd.Series of asset prices indexed by datetime
-    - signal: pd.Series of 0/1 position flags (1 = long)
-    - cost: pd.Series of transaction cost per trade (optional)
-    - pos_size: pd.Series of position sizing multipliers (optional)
-
-    Returns:
-    - df: pd.DataFrame with columns ['Return', 'Equity', 'Position']
-    - perf: dict of performance metrics (Total Return, CAGR, Sharpe, Max Drawdown)
+    Basic backtesting engine:
+    - Calculates equity curve from positions
+    - Tracks trades and returns a trade log
     """
-    # Daily returns
-    returns = price.pct_change().fillna(0)
 
-    # Position sizing
-    if pos_size is None:
-        position = signal.shift(1).fillna(0)
-    else:
-        position = (signal.shift(1).fillna(0) * pos_size.shift(1).fillna(0)).fillna(0)
+    df = pd.DataFrame({'Price': price_series, 'Position': positions}).copy()
+    df['Return'] = df['Price'].pct_change().fillna(0)
+    df['Strategy Return'] = df['Return'] * df['Position'].shift().fillna(0)
 
-    # Strategy returns
-    strat_ret = returns * position
+    # Calculate equity curve
+    df['Equity'] = (1 + df['Strategy Return']).cumprod()
 
-    # Transaction costs
-    if cost is not None:
-        trades = signal.diff().abs().fillna(0)
-        strat_ret = strat_ret - (cost * trades)
+    # Build trade log
+    trade_log = []
+    in_position = False
+    entry_date = None
+    entry_price = None
 
-    # Equity curve
-    equity = (1 + strat_ret).cumprod()
+    for date, row in df.iterrows():
+        pos = row['Position']
+        price = row['Price']
+
+        if pos != 0 and not in_position:
+            in_position = True
+            entry_date = date
+            entry_price = price
+        elif pos == 0 and in_position:
+            exit_date = date
+            exit_price = price
+            trade_log.append({
+                'Entry Date': entry_date,
+                'Exit Date': exit_date,
+                'Entry Price': entry_price,
+                'Exit Price': exit_price,
+                'Return': (exit_price - entry_price) / entry_price
+            })
+            in_position = False
+
+    trade_df = pd.DataFrame(trade_log)
 
     # Performance metrics
-    total_ret = equity.iloc[-1] - 1
-    # Approximate CAGR
-    days = (equity.index[-1] - equity.index[0]).days
-    cagr = (equity.iloc[-1]) ** (365.0 / days) - 1 if days > 0 else np.nan
-    sharpe = (strat_ret.mean() / strat_ret.std(ddof=1)) * np.sqrt(252) if strat_ret.std(ddof=1) > 0 else np.nan
-    max_dd = (equity / equity.cummax() - 1).min()
-
     perf = {
-        'Total Return': total_ret,
-        'CAGR': cagr,
-        'Sharpe': sharpe,
-        'Max Drawdown': max_dd
+        'Sharpe': df['Strategy Return'].mean() / df['Strategy Return'].std() * np.sqrt(252) if df['Strategy Return'].std() else 0,
+        'Max Drawdown': (df['Equity'] / df['Equity'].cummax() - 1).min(),
+        'Win Rate': (trade_df['Return'] > 0).mean() if not trade_df.empty else 0,
+        'Trade Frequency': len(trade_df) / ((df.index[-1] - df.index[0]).days / 365)
     }
 
-    # Build output DataFrame
-    df = pd.DataFrame({
-        'Return': strat_ret,
-        'Equity': equity,
-        'Position': position
-    })
+    return {
+        'performance': perf,
+        'equity_curve': df['Equity'],
+        'trade_log': trade_df
+    }
 
-    return df, perf
