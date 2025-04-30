@@ -34,7 +34,7 @@ def max_drawdown(equity_curve):
     equity = np.array(equity_curve)
     peaks = np.maximum.accumulate(equity)
     drawdowns = (equity - peaks) / peaks
-    return np.min(drawdowns)
+    return np.min(drawdowns) 
 
 
 def win_rate(trade_returns):
