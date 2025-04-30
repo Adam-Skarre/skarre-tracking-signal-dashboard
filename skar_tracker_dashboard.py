@@ -21,7 +21,6 @@ def _load_module(name: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
 # ─── Load core modules and bind functions ─────────────────────────────────────
 _pf  = _load_module("polynomial_fit")
 _sl  = _load_module("signal_logic")
@@ -47,8 +46,8 @@ grid_search_optimizer = _opt.grid_search_optimizer
 bootstrap_sharpe   = _val.bootstrap_sharpe
 regime_performance = _val.regime_performance
 
-# Data loader
-load_data = _dl.fetch_price_data  # match the function name in your data_loader.py
+# Data loader — use the actual function name defined in your data_loader.py
+load_data = _dl.load_data
 
 # ─── Streamlit app configuration ─────────────────────────────────────────────
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
