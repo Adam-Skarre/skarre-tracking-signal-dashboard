@@ -12,7 +12,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Core modules (must reside alongside this file)
 from polynomial_fit          import get_slope, get_acceleration
