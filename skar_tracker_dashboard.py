@@ -24,18 +24,18 @@ from validate_skarre_signal  import bootstrap_sharpe, regime_performance
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
 
 @st.cache_data(show_spinner=False)
-def get_data(ticker, start, end):
+def get_data(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFrame:
     # 1) Download full history
     raw = yf.download(ticker, progress=False)
     if raw.empty:
         return pd.DataFrame(columns=["Price"])
-    raw = raw[["Close"]].dropna()
-    raw.columns = ["Price"]
-    # 2) Ensure index is datetime.date
-    raw.index = pd.to_datetime(raw.index).date
-    # 3) Filter by start/end (inclusive)
-    mask = (raw.index >= start) & (raw.index <= end)
-    df = raw.loc[mask]
+    # 2) Keep and rename Close→Price
+    df = raw[["Close"]].dropna().rename(columns={"Close": "Price"})
+    # 3) Build inclusive timestamp bounds
+    ts_start = pd.Timestamp(start)
+    ts_end   = pd.Timestamp(end) + pd.Timedelta(days=1)
+    # 4) Filter the DataFrame by those timestamps
+    df = df.loc[(df.index >= ts_start) & (df.index < ts_end)]
     return df
 
 # Sidebar navigation
