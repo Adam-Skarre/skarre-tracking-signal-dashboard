@@ -128,13 +128,20 @@ elif page == "About":
 
     comparison_df = pd.DataFrame({
         "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
-      "Skarre Signal": [
-        f"{(result['trade_log']['Equity'].iloc[-1] - 1) * 100:.1f}%",
-        f"{result['metrics']['sharpe']:.2f}",
-        f"{result['metrics']['max_drawdown'] * 100:.0f}%",
-        f"{(result['metrics'].get('win_rate', 0) * 100):.0f}%",
-        f"{result['metrics']['trade_frequency']:.1f}"
-    ],
+      # Safely get final equity (handles empty trade_log)
+final_equity = (
+    result['trade_log']['Equity'].iloc[-1]
+    if not result['trade_log'].empty
+    else 1.0
+)
+
+"Skarre Signal": [
+    f"{(final_equity - 1) * 100:.1f}%",
+    f"{result['metrics'].get('sharpe', 0):.2f}",
+    f"{result['metrics'].get('max_drawdown', 0) * 100:.0f}%",
+    f"{(result['metrics'].get('win_rate', 0) * 100):.0f}%",
+    f"{result['metrics'].get('trade_frequency', 0):.1f}"
+],
         "SPY (Buy & Hold)": [
             f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
             "N/A",
