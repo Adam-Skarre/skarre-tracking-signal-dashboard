@@ -1,64 +1,42 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 def generate_signals(
-    slope: pd.Series,
-    accel: pd.Series,
-    entry_slope: float,
-    exit_slope: float,
-    use_sst: bool = False,
-    price: pd.Series = None,
-    ma_window: int = 50,
-    vol_window: int = 20,
-    min_holding_days: int = 3
+    slope_series: pd.Series,
+    accel_series: pd.Series = None,
+    entry_slope: float = 0.0,
+    exit_slope: float = 0.0,
+    use_acceleration: bool = False
 ) -> pd.Series:
     """
-    Generate long/flat trading signals based on slope, acceleration, and optional SST.
+    Generate long/flat position signals based on slope and optional acceleration.
 
     Parameters:
-    - slope: pd.Series of first derivatives
-    - accel: pd.Series of second derivatives (unused if use_sst)
-    - entry_slope: threshold to enter a long position
-    - exit_slope: threshold to exit a long position
-    - use_sst: whether to use SST = (price - MA)/volatility instead of raw slope
-    - price: pd.Series of prices (required if use_sst=True)
-    - ma_window: lookback window for moving average in SST
-    - vol_window: lookback window for volatility in SST
-    - min_holding_days: minimum bars to hold a position
+    - slope_series: pd.Series of first derivative values (slope)
+    - accel_series: pd.Series of second derivative values (acceleration)
+    - entry_slope: threshold above which to enter a long position
+    - exit_slope: threshold below which to exit the long position
+    - use_acceleration: if True, require accel_series > 0 for entry and < 0 for exit
 
     Returns:
-    - pd.Series of 0 (flat) or 1 (long) signals
+    - pd.Series of integer positions: 1 for long, 0 for flat
     """
-    if use_sst and price is None:
-        raise ValueError("price series must be provided when use_sst=True")
+    n = len(slope_series)
+    positions = np.zeros(n, dtype=int)
+    current_pos = 0
 
-    # Precompute SST if needed
-    if use_sst:
-        ma = price.rolling(window=ma_window).mean()
-        vol = price.pct_change().rolling(window=vol_window).std().replace(0, np.nan)
-        sst = (price - ma) / vol
-        entry_signal = sst > entry_slope
-        exit_signal  = sst < exit_slope
-    else:
-        entry_signal = slope > entry_slope
-        exit_signal  = slope < exit_slope
+    for i in range(1, n):
+        slope = slope_series.iloc[i]
+        accel = accel_series.iloc[i] if (use_acceleration and accel_series is not None) else None
 
-    # Initialize signal series
-    signal = pd.Series(0, index=slope.index, dtype=int)
-    position = 0
-    hold_count = 0
+        # Entry rule
+        if current_pos <= 0 and slope > entry_slope and (not use_acceleration or accel > 0):
+            current_pos = 1
+        # Exit rule
+        elif current_pos >= 1 and slope < exit_slope and (not use_acceleration or accel < 0):
+            current_pos = 0
 
-    for t in slope.index:
-        if position == 0:
-            if entry_signal.loc[t]:
-                position = 1
-                hold_count = 1
-        else:
-            hold_count += 1
-            if exit_signal.loc[t] and hold_count >= min_holding_days:
-                position = 0
-                hold_count = 0
-        signal.loc[t] = position
+        positions[i] = current_pos
 
-    return signal
+    return pd.Series(positions, index=slope_series.index)
