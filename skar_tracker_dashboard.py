@@ -30,15 +30,18 @@ _opt = _load_module("optimizer")
 _val = _load_module("validate_skarre_signal")
 _dl  = _load_module("data_loader")
 
-get_slope            = _pf.get_slope
-get_acceleration     = _pf.get_acceleration
-generate_skarre_signal = _sl.generate_skarre_signal
+get_slope        = _pf.get_slope
+get_acceleration = _pf.get_acceleration
+
+# **Corrected binding** – use the actual function name from signal_logic.py
+generate_signals = _sl.generate_signals
+
 backtest             = _bt.backtest
 evaluate_strategy    = _bt.evaluate_strategy
 grid_search_optimizer = _opt.grid_search_optimizer
 bootstrap_sharpe     = _val.bootstrap_sharpe
 regime_performance   = _val.regime_performance
-load_data            = _dl.load_data  # function to fetch price data
+load_data            = _dl.load_data
 
 # ─── Streamlit app configuration ─────────────────────────────────────────────
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
