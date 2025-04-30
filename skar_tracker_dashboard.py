@@ -68,22 +68,16 @@ page = st.sidebar.radio("Select View", pages)
 
 # ─── Utility: fetch data with caching ──────────────────────────────────────────
 @st.cache_data(show_spinner=False)
-def get_data(ticker: str, start: datetime, end: datetime) -> pd.DataFrame:
-    """
-    Download a single‐ticker price series (Close) using download_price_data,
-    then filter by date range.
-    """
-    # download_price_data returns a DataFrame with tickers as columns
-    df = download_price_data([ticker], start, end)
-    if df.empty or ticker not in df.columns:
-        return pd.DataFrame(columns=["Close"])
-    # extract and rename
-    price_df = df[[ticker]].rename(columns={ticker: "Close"})
-    # ensure datetime index
-    price_df.index = pd.to_datetime(price_df.index)
-    # slice by inclusive dates
-    mask = (price_df.index >= pd.to_datetime(start)) & (price_df.index <= pd.to_datetime(end))
-    return price_df.loc[mask]
+def get_data(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFrame:
+    # Download daily history (including the most recent day)
+    df = yf.download(ticker, start=start, end=end + timedelta(days=1), progress=False)
+    if df.empty:
+        return pd.DataFrame(columns=["Price"])
+    df = df[["Close"]].rename(columns={"Close": "Price"})
+    df.index = pd.to_datetime(df.index)    # keep full Timestamp
+    # Filter between start and end (inclusive)
+    mask = (df.index.date >= start) & (df.index.date <= end)
+    return df.loc[mask]
 
 # ─── Page: About ─────────────────────────────────────────────────────────────
 if page == "About":
