@@ -25,16 +25,17 @@ st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
 
 @st.cache_data(show_spinner=False)
 def get_data(ticker, start, end):
-    # Cap end at today’s date
-    today = datetime.today().date()
-    if end >= today:
-        end = today
-    # Make end inclusive by adding one day for yfinance
-    yf_end = end + timedelta(days=1)
-
-    df = yf.download(ticker, start=start, end=yf_end, progress=False)
-    df = df[['Close']].dropna()
-    df.columns = ['Price']
+    # 1) Download full history
+    raw = yf.download(ticker, progress=False)
+    if raw.empty:
+        return pd.DataFrame(columns=["Price"])
+    raw = raw[["Close"]].dropna()
+    raw.columns = ["Price"]
+    # 2) Ensure index is datetime.date
+    raw.index = pd.to_datetime(raw.index).date
+    # 3) Filter by start/end (inclusive)
+    mask = (raw.index >= start) & (raw.index <= end)
+    df = raw.loc[mask]
     return df
 
 # Sidebar navigation
