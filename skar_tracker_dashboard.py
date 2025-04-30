@@ -1,88 +1,67 @@
 # skar_tracker_dashboard.py
-import os, sys, importlib.util
+
+import os, sys
+from datetime import datetime, timedelta
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 import yfinance as yf
-from datetime import datetime, timedelta
 
-# ─── Ensure skar_lib/ is on PYTHONPATH ─────────────────────────────────────────
+# ─── Ensure skar_lib is on path ───────────────────────────────────────────────
 BASE_DIR = os.path.dirname(__file__)
 LIB_DIR  = os.path.join(BASE_DIR, "skar_lib")
 if os.path.isdir(LIB_DIR) and LIB_DIR not in sys.path:
     sys.path.insert(0, LIB_DIR)
 
-# ─── Dynamically load a module by filename ────────────────────────────────────
-def _load_module(name):
-    path = os.path.join(LIB_DIR, f"{name}.py")
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod  = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-# ─── Load core modules ────────────────────────────────────────────────────────
-_pf  = _load_module("polynomial_fit")
-_sl  = _load_module("signal_logic")
-_bt  = _load_module("backtester")
-_opt = _load_module("optimizer")
-_val = _load_module("validate_skarre_signal")
-_dl  = _load_module("data_loader")
-
-# ─── Bind functions to consistent names ───────────────────────────────────────
-get_slope        = _pf.get_slope
-get_acceleration = _pf.get_acceleration
-
-generate_signals      = _sl.generate_signals
-backtest              = _bt.backtest
-grid_search_optimizer = _opt.grid_search_optimizer
-bootstrap_sharpe      = _val.bootstrap_sharpe
-regime_performance    = _val.regime_performance
-
-download_price_data = _dl.load_data  # adjust if named differently
+# ─── Core strategy modules ────────────────────────────────────────────────────
+from polynomial_fit            import get_slope, get_acceleration
+from signal_logic              import generate_signals
+from backtester                import backtest, evaluate_strategy
+from optimizer                 import grid_search_optimizer
+from validate_skarre_signal    import bootstrap_sharpe, regime_performance
 
 # ─── Streamlit config ────────────────────────────────────────────────────────
-st.set_page_config(page_title="Skarre Tracker V3", layout="wide")
+st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
 
-# ─── Data fetching with caching ──────────────────────────────────────────────
+# ─── Data fetching (inclusive end date) ───────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def get_data(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFrame:
-    # include end date by adding one day (yf.download is exclusive)
+    """
+    Download daily Close prices for ticker over [start, end], inclusive.
+    """
+    # Yahoo Finance end date is exclusive, so add one day:
     df = yf.download(ticker, start=start, end=end + timedelta(days=1), progress=False)
-    if df.empty:
+    if df.empty or "Close" not in df:
         return pd.DataFrame(columns=["Price"])
     df = df[["Close"]].rename(columns={"Close": "Price"})
     df.index = pd.to_datetime(df.index)
+    # Filter to exactly start/end
     mask = (df.index.date >= start) & (df.index.date <= end)
     return df.loc[mask]
 
-# ─── Cached, coarse grid search for demo ──────────────────────────────────────
+# ─── Cached, coarse grid search for demo speed ─────────────────────────────────
 @st.cache_data(show_spinner=False)
 def run_grid_search(price, slope, accel):
-    # coarse steps for speed demo
-    entry_range = np.arange(0.0, 2.1, 0.5)
+    entry_range = np.arange(0.0, 2.1, 0.5)   # coarse steps for speed
     exit_range  = np.arange(-2.0, 0.1, 0.5)
     best, df = grid_search_optimizer(
-        price=price,
-        slope=slope,
-        accel=accel,
-        entry_range=entry_range,
-        exit_range=exit_range,
-        use_sst=True,
-        ma_window=50,
-        vol_window=20,
-        min_holding_days=3
+        price=price, slope=slope, accel=accel,
+        entry_range=entry_range, exit_range=exit_range,
+        use_sst=True, ma_window=50, vol_window=20, min_holding_days=3
     )
     return best, df
 
-# ─── Cached bootstrap for demo ───────────────────────────────────────────────
+# ─── Cached bootstrap for demo speed ──────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def run_bootstrap(price, signal):
+    # 500 resamples only
     return bootstrap_sharpe(price, signal, n_boot=500, block_size=20)
 
-# ─── Sidebar navigation ─────────────────────────────────────────────────────
+# ─── Sidebar navigation ──────────────────────────────────────────────────────
 st.sidebar.title("Navigation")
-pages = [
+page = st.sidebar.radio("Go to", [
     "About",
     "Live Signal Tracker",
     "Derivative Diagnostics",
@@ -91,35 +70,34 @@ pages = [
     "Threshold Optimization",
     "Strategy Performance",
     "Trade Log"
-]
-page = st.sidebar.radio("Select View", pages)
+])
 
-# ─── Page: About ─────────────────────────────────────────────────────────────
+# ─── Page: About ──────────────────────────────────────────────────────────────
 if page == "About":
-    st.title("Skarre Tracker V3: Engineering & Validation")
+    st.title("Skarre Tracker Dashboard")
     st.markdown("""
-**V3 Highlights**  
-- Regime-aware, SST-adjusted signals  
-- Realistic costs, position sizing  
-- Multi-asset & live-ready Streamlit UI  
+**Version 3** of the Skarre Signal system:
+- Regime-aware, SST-adjusted slope signals  
+- Realistic costs & dynamic position sizing  
+- Multi-asset, live-ready Streamlit UI  
 - Rigorous walk-forward & bootstrap validation  
     """)
-    st.markdown("Developed as part of ME 3296 Independent Study — aiming for robust, real-world outperformance.")
+    st.markdown("Built as part of ME 3296 Independent Study — aiming for robust, real-world outperformance.")
 
-# ─── Page: Live Signal Tracker ───────────────────────────────────────────────
+# ─── Page: Live Signal Tracker ────────────────────────────────────────────────
 elif page == "Live Signal Tracker":
-    st.title("Live Signal Tracker (SPY example)")
+    st.title("Live Signal Tracker")
     ticker     = st.sidebar.text_input("Ticker", "SPY").upper()
-    start_date = st.sidebar.date_input("Start Date",  datetime(2022,1,1))
-    end_date   = st.sidebar.date_input("End Date",    datetime.today().date())
-    entry_th   = st.sidebar.slider("Entry Th (slope)", 0.0, 5.0, 0.5, 0.1)
-    exit_th    = st.sidebar.slider("Exit Th (slope)", -5.0, 0.0, -0.5, 0.1)
+    start_date = st.sidebar.date_input("Start Date", datetime(2022, 1, 1).date())
+    end_date   = st.sidebar.date_input("End Date",   datetime.today().date())
+    entry_th   = st.sidebar.slider("Entry Threshold (slope)",  0.0, 5.0, 0.5, 0.1)
+    exit_th    = st.sidebar.slider("Exit Threshold (slope)",  -5.0, 0.0, -0.5, 0.1)
     use_accel  = st.sidebar.checkbox("Use Acceleration", True)
-    show_mark  = st.sidebar.checkbox("Show Buy/Sell",    True)
+    show_marks = st.sidebar.checkbox("Show Buy/Sell Markers", True)
 
     df = get_data(ticker, start_date, end_date)
     if df.empty:
-        st.warning(f"No data for {ticker} from {start_date} to {end_date}.")
+        st.warning(f"No data found for {ticker} from {start_date} to {end_date}.")
         st.stop()
 
     price = df["Price"]
@@ -128,109 +106,133 @@ elif page == "Live Signal Tracker":
     sig   = generate_signals(slope, accel, entry_th, exit_th, use_acceleration=use_accel)
 
     fig = go.Figure([go.Scatter(x=price.index, y=price, name="Price")])
-    if show_mark:
+    if show_marks:
         buys  = price[sig ==  1]
         sells = price[sig == -1]
-        fig.add_trace(go.Scatter(x=buys.index,  y=buys,  mode="markers", name="Buy",  marker_symbol="triangle-up"))
-        fig.add_trace(go.Scatter(x=sells.index, y=sells, mode="markers", name="Sell", marker_symbol="triangle-down"))
+        fig.add_trace(go.Scatter(
+            x=buys.index, y=buys, mode="markers", name="Buy",
+            marker=dict(symbol="triangle-up", size=8, color="green")
+        ))
+        fig.add_trace(go.Scatter(
+            x=sells.index, y=sells, mode="markers", name="Sell",
+            marker=dict(symbol="triangle-down", size=8, color="red")
+        ))
+    fig.update_layout(height=500, title=f"{ticker} with Skarre Signals")
     st.plotly_chart(fig, use_container_width=True)
 
-# ─── Page: Derivative Diagnostics ───────────────────────────────────────────
+# ─── Page: Derivative Diagnostics ────────────────────────────────────────────
 elif page == "Derivative Diagnostics":
     st.title("Derivative Diagnostics")
-    ticker = st.sidebar.text_input("Ticker", "SPY").upper()
-    sd     = st.sidebar.date_input("Start", datetime(2010,1,1))
-    ed     = st.sidebar.date_input("End",   datetime.today().date())
-    entryS = st.sidebar.slider("Entry Slope",  0.0, 10.0, 0.5, 0.1)
-    exitS  = st.sidebar.slider("Exit Slope",  -10.0, 0.0, -0.5, 0.1)
-    useA   = st.sidebar.checkbox("Use Acceleration", False)
+    ticker  = st.sidebar.text_input("Ticker", "SPY").upper()
+    sd      = st.sidebar.date_input("Start Date", datetime(2010, 1, 1).date())
+    ed      = st.sidebar.date_input("End Date",   datetime.today().date())
+    entryS  = st.sidebar.slider("Entry Slope", 0.0, 10.0, 0.5, 0.1)
+    exitS   = st.sidebar.slider("Exit Slope",  -10.0, 0.0, -0.5, 0.1)
+    useA    = st.sidebar.checkbox("Use Acceleration", False)
 
     df = get_data(ticker, sd, ed)
-    if df.empty: st.warning("No data"); st.stop()
+    if df.empty:
+        st.warning("No data for that range."); st.stop()
+
     price = df["Price"]
     slope = get_slope(price)
     accel = get_acceleration(price)
-    st.line_chart(pd.DataFrame({"Price":price,"Slope":slope,"Accel":accel}))
 
-# ─── Page: Polynomial Fit Curve ─────────────────────────────────────────────
+    st.subheader("Price, Slope & Acceleration")
+    diag_df = pd.DataFrame({
+        "Price": price,
+        "Slope": slope,
+        "Accel": accel
+    })
+    st.line_chart(diag_df)
+
+# ─── Page: Polynomial Fit Curve ──────────────────────────────────────────────
 elif page == "Polynomial Fit Curve":
     st.title("Polynomial Fit Curve")
     ticker = st.sidebar.text_input("Ticker", "SPY").upper()
-    window = st.sidebar.slider("Window Size", 10, 100, 21, 1)
+    window = st.sidebar.slider("Window Size", 10, 50, 21, 1)
 
-    df = get_data(ticker, datetime(2022,1,1), datetime.today().date())
-    if df.empty: st.warning("No data"); st.stop()
+    df = get_data(ticker, datetime(2022,1,1).date(), datetime.today().date())
+    if df.empty:
+        st.warning("No data"); st.stop()
+
     price = df["Price"]
-
-    xs, fit_vals = np.arange(window), []
-    dates = []
+    xs = np.arange(window)
+    fit_vals, dates = [], []
     for i in range(window, len(price)):
         ys = price.iloc[i-window:i].values
         coeffs = np.polyfit(xs, ys, 2)
         fit_vals.append(np.poly1d(coeffs)(xs)[-1])
         dates.append(price.index[i-1])
-    fit = pd.Series(fit_vals, index=dates)
 
-    st.line_chart(pd.DataFrame({"Price":price, "PolyFit":fit}))
+    fit = pd.Series(fit_vals, index=dates)
+    fig = go.Figure([
+        go.Scatter(x=price.index, y=price, name="Price"),
+        go.Scatter(x=fit.index,   y=fit,   name="Poly Fit")
+    ])
+    st.plotly_chart(fig, use_container_width=True)
 
 # ─── Page: Derivative Histograms ───────────────────────────────────────────
 elif page == "Derivative Histograms":
-    st.title("Derivative Value Distributions")
-    df = get_data("SPY", datetime(2022,1,1), datetime.today().date())
+    st.title("Slope & Acceleration Histograms")
+    df    = get_data("SPY", datetime(2022,1,1).date(), datetime.today().date())
     price = df["Price"]
     slope = get_slope(price).dropna()
     accel = get_acceleration(price).dropna()
+
+    st.subheader("Slope Distribution")
     st.bar_chart(slope.value_counts(bins=30).sort_index())
+    st.subheader("Acceleration Distribution")
     st.bar_chart(accel.value_counts(bins=30).sort_index())
 
 # ─── Page: Threshold Optimization ───────────────────────────────────────────
 elif page == "Threshold Optimization":
-    st.title("Threshold Optimization")
-    df = get_data("SPY", datetime(2022,1,1), datetime.today().date())
+    st.title("Threshold Optimization (Coarse Grid)")
+    df    = get_data("SPY", datetime(2022,1,1).date(), datetime.today().date())
     price = df["Price"]
     slope = get_slope(price)
     accel = get_acceleration(price)
 
-    with st.spinner("Grid search…"):
+    with st.spinner("Running grid search…"):
         (best_e, best_x, best_sh), results_df = run_grid_search(price, slope, accel)
 
-    st.success(f"Best entry={best_e}, exit={best_x} → Sharpe={best_sh:.2f}")
-    st.dataframe(results_df.style.background_gradient(cmap="RdYlGn"))
+    st.success(f"Best entry={best_e:.2f}, exit={best_x:.2f} → Sharpe={best_sh:.2f}")
+    st.dataframe(results_df.style.background_gradient("RdYlGn"))
 
 # ─── Page: Strategy Performance ─────────────────────────────────────────────
 elif page == "Strategy Performance":
-    st.title("Strategy vs Buy & Hold")
-    df = get_data("SPY", datetime(2022,1,1), datetime.today().date())
+    st.title("Strategy vs Buy-and-Hold")
+    df    = get_data("SPY", datetime(2022,1,1).date(), datetime.today().date())
     price = df["Price"]
     slope = get_slope(price)
     accel = get_acceleration(price)
     sig   = generate_signals(slope, accel, 0.5, -0.5, use_acceleration=True)
 
     res = backtest(price, sig)
-    eq  = res["equity_curve"] if "equity_curve" in res else res["Equity"]
+    eq  = res["equity_curve"]
     bh  = (1 + price.pct_change().fillna(0)).cumprod()
 
     st.line_chart(pd.DataFrame({"Strategy":eq, "BuyHold":bh}))
     perf = res["performance"]
-    st.metric("Sharpe",           f"{perf['Sharpe']:.2f}")
-    st.metric("Total Return",     f"{perf['Total Return']*100:.2f}%")
-    st.metric("Max Drawdown",     f"{perf['Max Drawdown']*100:.2f}%")
-    st.metric("Trades per Year",  f"{perf.get('Trade Frequency', np.nan):.1f}")
+    st.metric("Sharpe Ratio",    f"{perf['Sharpe']:.2f}")
+    st.metric("Total Return",    f"{perf['Total Return']*100:.1f}%")
+    st.metric("Max Drawdown",    f"{perf['Max Drawdown']*100:.1f}%")
+    st.metric("Trades per Year", f"{perf['Trade Frequency']:.1f}")
 
 # ─── Page: Trade Log ─────────────────────────────────────────────────────────
 elif page == "Trade Log":
     st.title("Trade Log")
-    df = get_data("SPY", datetime(2022,1,1), datetime.today().date())
+    df    = get_data("SPY", datetime(2022,1,1).date(), datetime.today().date())
     price = df["Price"]
     slope = get_slope(price)
     accel = get_acceleration(price)
     sig   = generate_signals(slope, accel, 0.5, -0.5, use_acceleration=True)
 
     res = backtest(price, sig)
-    log = res.get("trade_log", pd.DataFrame())
-    if log.empty:
+    trades = res.get("trade_log", pd.DataFrame())
+    if trades.empty:
         st.info("No trades triggered.")
     else:
-        st.dataframe(log)
-        csv = log.to_csv(index=False)
+        st.dataframe(trades)
+        csv = trades.to_csv(index=False)
         st.download_button("Download CSV", csv, "trade_log.csv")
