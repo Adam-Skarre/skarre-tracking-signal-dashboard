@@ -24,25 +24,17 @@ from validate_skarre_signal  import bootstrap_sharpe, regime_performance
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
 
 @st.cache_data(show_spinner=False)
-def get_data(ticker: str, start: datetime.date, end: datetime.date) -> pd.DataFrame:
-    # 1) Download full history with explicit start/end
-    yf_end = pd.Timestamp(end) + pd.Timedelta(days=1)
-    raw = yf.download(ticker, start=pd.Timestamp(start), end=yf_end, progress=False)
-    
-    # DEBUG: see what raw looks like
-    st.write("raw download rows:", raw.shape[0])
-    
+def get_data(ticker, start, end):
+    # 1) Convert to Timestamps
+    ts_start = pd.to_datetime(start)
+    ts_end   = pd.to_datetime(end) + pd.Timedelta(days=1)
+    # 2) Download data
+    raw = yf.download(ticker, start=ts_start, end=ts_end, progress=False)
     if raw.empty:
         return pd.DataFrame(columns=["Price"])
-    
+    # 3) Rename and filter
     df = raw[["Close"]].rename(columns={"Close":"Price"})
-    
-    # 2) Filter inclusive by start/end
-    ts_start = pd.Timestamp(start)
-    ts_end   = pd.Timestamp(end) + pd.Timedelta(days=1)
     df = df.loc[(df.index >= ts_start) & (df.index < ts_end)]
-    
-    st.write("filtered rows:", df.shape[0])
     return df
 
 # Sidebar navigation
