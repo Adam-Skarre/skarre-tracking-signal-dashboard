@@ -1,61 +1,73 @@
-import numpy as np
 import pandas as pd
-from signal_logic import generate_skarre_signal
-from backtester    import evaluate_strategy
+from backtester import backtest
+from signal_logic import generate_signals
+
 
 def grid_search_optimizer(
-    price_series: pd.Series,
-    entry_slope_grid: list,
-    exit_slope_grid: list,
-    entry_sst_grid: list,
-    exit_sst_grid: list,
-    slope_window: int = 5,
-    ma_window: int = 20,
+    price: pd.Series,
+    slope: pd.Series,
+    accel: pd.Series,
+    entry_range: list,
+    exit_range: list,
+    use_sst: bool = False,
+    ma_window: int = 50,
     vol_window: int = 20,
-    min_holding_days: int = 5,
-    cost_params: dict = None
-) -> tuple:
+    min_holding_days: int = 3,
+    cost_series: pd.Series = None,
+    pos_size_series: pd.Series = None
+) -> (tuple, pd.DataFrame):
     """
-    Performs a 4D grid search over entry/exit slope and entry/exit SST.
-    Returns: (best_params, best_sharpe, results_df)
+    Perform grid search over entry and exit thresholds to maximize Sharpe ratio.
+
+    Parameters:
+    - price: pd.Series of prices
+    - slope: pd.Series of first derivative
+    - accel: pd.Series of second derivative
+    - entry_range: sequence of entry threshold values
+    - exit_range: sequence of exit threshold values
+    - use_sst: flag to use SST logic instead of raw slope
+    - ma_window, vol_window: parameters for SST
+    - min_holding_days: minimum holding period for signals
+    - cost_series: pd.Series of transaction costs (optional)
+    - pos_size_series: pd.Series of position sizes (optional)
+
+    Returns:
+    - best_params: (entry_threshold, exit_threshold, Sharpe)
+    - results_df: pd.DataFrame with columns ['entry', 'exit', 'Sharpe', 'Total Return', 'Max Drawdown']
     """
-    best_sharpe = -np.inf
-    best_params = None
-    results = []
-
-    for es in entry_slope_grid:
-        for xs in exit_slope_grid:
-            for est in entry_sst_grid:
-                for xst in exit_sst_grid:
-                    sig = generate_skarre_signal(
-                        price_series,
-                        entry_slope_threshold=es,
-                        exit_slope_threshold=xs,
-                        entry_sst_threshold=est,
-                        exit_sst_threshold=xst,
-                        slope_window=slope_window,
-                        ma_window=ma_window,
-                        vol_window=vol_window,
-                        min_holding_days=min_holding_days
-                    )
-                    sharpe, r, dd, tr, _ = evaluate_strategy(
-                        price_series, sig, cost_params
-                    )
-
-                    results.append({
-                        "entry_slope": es,
-                        "exit_slope": xs,
-                        "entry_sst": est,
-                        "exit_sst": xst,
-                        "Sharpe": sharpe,
-                        "Return": r,
-                        "Drawdown": dd,
-                        "Trades": tr
-                    })
-
-                    if sharpe > best_sharpe:
-                        best_sharpe = sharpe
-                        best_params = (es, xs, est, xst)
-
-    df = pd.DataFrame(results).sort_values("Sharpe", ascending=False)
-    return best_params, best_sharpe, df
+    records = []
+    for entry in entry_range:
+        for exit in exit_range:
+            # generate signals
+            signals = generate_signals(
+                slope=slope,
+                accel=accel,
+                entry_slope=entry,
+                exit_slope=exit,
+                use_sst=use_sst,
+                price=price,
+                ma_window=ma_window,
+                vol_window=vol_window,
+                min_holding_days=min_holding_days
+            )
+            # backtest
+            df, perf = backtest(
+                price=price,
+                signal=signals,
+                cost=cost_series,
+                pos_size=pos_size_series
+            )
+            records.append({
+                'entry': entry,
+                'exit': exit,
+                'Sharpe': perf['Sharpe'],
+                'Total Return': perf['Total Return'],
+                'Max Drawdown': perf['Max Drawdown']
+            })
+    results_df = pd.DataFrame.from_records(records)
+    # drop nan Sharpe
+    results_df = results_df.dropna(subset=['Sharpe'])
+    # find best Sharpe
+    best = results_df.loc[results_df['Sharpe'].idxmax()]
+    best_params = (best['entry'], best['exit'], best['Sharpe'])
+    return best_params, results_df
