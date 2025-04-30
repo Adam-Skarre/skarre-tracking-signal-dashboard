@@ -46,8 +46,8 @@ grid_search_optimizer = _opt.grid_search_optimizer
 bootstrap_sharpe   = _val.bootstrap_sharpe
 regime_performance = _val.regime_performance
 
-# Data loader — use the actual function name defined in your data_loader.py
-load_data = _dl.load_data
+# Data loader — use the actual function name in data_loader.py
+download_price_data = _dl.download_price_data
 
 # ─── Streamlit app configuration ─────────────────────────────────────────────
 st.set_page_config(page_title="Skarre Tracker Dashboard", layout="wide")
@@ -70,16 +70,20 @@ page = st.sidebar.radio("Select View", pages)
 @st.cache_data(show_spinner=False)
 def get_data(ticker: str, start: datetime, end: datetime) -> pd.DataFrame:
     """
-    Wrapper around your data_loader.load_data to ensure date filtering
+    Download a single‐ticker price series (Close) using download_price_data,
+    then filter by date range.
     """
-    df = load_data(ticker, start, end)
-    # Expect df.index as datetime (or convert)
-    if isinstance(df.index, pd.DatetimeIndex) is False:
-        try:
-            df.index = pd.to_datetime(df.index)
-        except Exception:
-            pass
-    return df
+    # download_price_data returns a DataFrame with tickers as columns
+    df = download_price_data([ticker], start, end)
+    if df.empty or ticker not in df.columns:
+        return pd.DataFrame(columns=["Close"])
+    # extract and rename
+    price_df = df[[ticker]].rename(columns={ticker: "Close"})
+    # ensure datetime index
+    price_df.index = pd.to_datetime(price_df.index)
+    # slice by inclusive dates
+    mask = (price_df.index >= pd.to_datetime(start)) & (price_df.index <= pd.to_datetime(end))
+    return price_df.loc[mask]
 
 # ─── Page: About ─────────────────────────────────────────────────────────────
 if page == "About":
