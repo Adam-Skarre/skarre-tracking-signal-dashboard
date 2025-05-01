@@ -131,7 +131,7 @@ elif page == "About":
 comparison_df = pd.DataFrame({
     "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
     "Skarre Signal": [
-        f"{(result['equity_curve'].iloc[-1] - 1) * 100:.1f}%",
+        f"{(final_equity - 1) * 100:.1f}%",
         f"{performance.get('Sharpe', np.nan):.2f}",
         f"{performance.get('Max Drawdown', np.nan) * 100:.0f}%",
         f"{performance.get('Win Rate', np.nan) * 100:.0f}%",
