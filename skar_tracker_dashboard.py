@@ -117,16 +117,28 @@ elif page == "About":
     """)
 
     # Live backtest result for SPY (2020–2024)
-    price = get_data("SPY", "2020-01-01", "2024-12-31")["Price"]
-    slope = get_slope(price)
-    accel = get_acceleration(price)
-    signals = generate_signals(slope, accel, 0.5, -0.5, use_acceleration=True)
+   # Live backtest result for SPY (2020–2024)
+price = get_data("SPY", "2020-01-01", "2024-12-31")["Price"]
+slope = get_slope(price)
+accel = get_acceleration(price)
+signals = generate_signals(slope, accel, 0.5, -0.5, use_acceleration=True)
+
+# Safe backtest
+try:
     result = backtest(price, signals)
+    if not isinstance(result, dict):
+        st.warning("⚠ 'result' is not a dictionary, setting to empty dictionary.")
+        result = {}
+except Exception as e:
+    st.error(f"⚠ 'backtest()' failed: {e}")
+    result = {}
 
-    buy_hold = (1 + price.pct_change().fillna(0)).cumprod()
-    buy_hold_drawdown = (buy_hold / buy_hold.cummax() - 1).min()
+buy_hold = (1 + price.pct_change().fillna(0)).cumprod()
+buy_hold_drawdown = (buy_hold / buy_hold.cummax() - 1).min()
 
-    performance = result.get('performance', {})
+# Safely get performance data
+performance = result.get('performance', {})
+
 # Safely get final equity
 if 'equity_curve' in result and not result['equity_curve'].empty:
     final_equity = result['equity_curve'].iloc[-1]
