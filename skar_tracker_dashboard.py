@@ -160,30 +160,28 @@ comparison_df = pd.DataFrame({
     ]
 }).set_index("Metric")
 
-with st.expander("View Live Performance Table"):
-    st.dataframe(comparison_df)
+if page == "Performance Table":
+    with st.expander("View Live Performance Table"):
+        st.dataframe(comparison_df)
+        st.markdown("""
+        *Note: These values are computed using fixed thresholds (entry = 0.5, exit = –0.5) over the 2020–2024 period, and are subject to change based on market conditions.*
 
-    st.markdown("""
-    *Note: These values are computed using fixed thresholds (entry = 0.5, exit = –0.5) over the 2020–2024 period, and are subject to change based on market conditions.*
+        ### Conclusion
 
-    ### Conclusion
+        This dashboard reflects a structured, engineering-first approach to market modeling.  
+        It was developed as part of the academic study "Engineering, Optimization, and Comparison of Algorithmic Trading,” which blends principles from mechanical systems analysis, data science, and quantitative finance. 
 
-    This dashboard reflects a structured, engineering-first approach to market modeling.  
-    It was developed as part of the academic study "Engineering, Optimization, and Comparison of Algorithmic Trading,” which blends principles from mechanical systems analysis, data science, and quantitative finance. 
-
-    The Skarre Signal is not intended as financial advice or a final product. Instead, it is an evolving model and presentation tool — built to explore whether mathematical rigor and optimization can consistently outperform intuition in dynamic financial systems.
-    """)
-# DERIVATIVE DIAGNOSTICS
-# --- Derivative Diagnostics Page ---
+        The Skarre Signal is not intended as financial advice or a final product. Instead, it is an evolving model and presentation tool — built to explore whether mathematical rigor and optimization can consistently outperform intuition in dynamic financial systems.
+        """)
 elif page == "Derivative Diagnostics":
     st.title("Derivative Diagnostics")
     st.markdown("""
-Explore Skarre’s **slope** and **acceleration** signals for any ticker and timeframe.
-- **Slope (1st derivative)** = rate of change (momentum)  
-- **Acceleration (2nd derivative)** = change of momentum (regime shifts)
+    Explore Skarre’s **slope** and **acceleration** signals for any ticker and timeframe.
+    - **Slope (1st derivative)** = rate of change (momentum)  
+    - **Acceleration (2nd derivative)** = change of momentum (regime shifts)
 
-Use the controls below to select your ticker, date range, and thresholds.
-""")
+    Use the controls below to select your ticker, date range, and thresholds.
+    """)
 
     # Sidebar controls
     ticker        = st.sidebar.text_input("Ticker Symbol", "SPY").upper()
