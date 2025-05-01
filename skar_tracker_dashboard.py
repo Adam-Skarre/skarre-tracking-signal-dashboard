@@ -143,7 +143,7 @@ comparison_df = pd.DataFrame({
         f"{performance.get('Trade Frequency', np.nan):.1f}"
     ],
     "SPY (Buy & Hold)": [
-        f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
+        f"{(final_buy_hold - 1) * 100:.1f}%",
         "N/A",
         f"{buy_hold_drawdown * 100:.0f}%",
         "N/A",
