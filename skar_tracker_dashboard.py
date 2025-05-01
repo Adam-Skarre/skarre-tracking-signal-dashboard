@@ -127,65 +127,47 @@ elif page == "About":
     buy_hold_drawdown = (buy_hold / buy_hold.cummax() - 1).min()
 
     comparison_df = pd.DataFrame({
-    "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"]
-})
+        "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
+        "Skarre Signal": [
+            f"{(result['equity_curve'].iloc[-1] - 1) * 100:.1f}%",
+            f"{result['performance']['Sharpe']:.2f}",
+            f"{result['performance']['Max Drawdown'] * 100:.0f}%",
+            f"{result['performance']['Win Rate'] * 100:.0f}%",
+            f"{result['performance']['Trade Frequency']:.1f}"
+        ],
+        "SPY (Buy & Hold)": [
+            f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
+            "N/A",
+            f"{buy_hold_drawdown * 100:.0f}%",
+            "N/A",
+            "1"
+        ]
+    }).set_index("Metric")
 
-print(type(result))
-print(result.keys())
-print(result['metrics'])
-print(result['trade_log'])
-# Safely extract final equity (avoids indexing empty DataFrame)
-trade_log = result["trade_log"]
-if not trade_log.empty:
-    final_equity = trade_log["Equity"].iloc[-1]
-else:
-    final_equity = 1.0
-
-# Build your metrics table as a DataFrame
-if not buy_hold.empty:
-    buy_hold_final = buy_hold.iloc[-1]
-else:
-    buy_hold_final = 1.0  # fallback baseline (no growth)
-    comparison_df = pd.DataFrame({
-    "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
-    "Skarre Signal": [
-        f"{(final_equity - 1) * 100:.1f}%",
-        f"{result['metrics'].get('sharpe', 0):.2f}",
-        f"{result['metrics'].get('max_drawdown', 0) * 100:.0f}%",
-        f"{(result['metrics'].get('win_rate', 0) * 100):.0f}%",
-        f"{result['metrics'].get('trade_frequency', 0):.1f}"
-    ],
-    "SPY (Buy & Hold)": [
-        f"{(buy_hold_final - 1) * 100:.1f}%",
-        "N/A",
-        f"{buy_hold_drawdown * 100:.0f}%",
-        "N/A",
-        "1"
-    ]
-}).set_index("Metric")
-
-if page == "Performance Table":
     with st.expander("View Live Performance Table"):
         st.dataframe(comparison_df)
-        st.markdown("""
-        *Note: These values are computed using fixed thresholds (entry = 0.5, exit = –0.5) over the 2020–2024 period, and are subject to change based on market conditions.*
 
-        ### Conclusion
+    st.markdown("""
+    *Note: These values are computed using fixed thresholds (entry = 0.5, exit = –0.5) over the 2020–2024 period, and are subject to change based on market conditions.*
 
-        This dashboard reflects a structured, engineering-first approach to market modeling.  
-        It was developed as part of the academic study "Engineering, Optimization, and Comparison of Algorithmic Trading,” which blends principles from mechanical systems analysis, data science, and quantitative finance. 
+    ### Conclusion
 
-        The Skarre Signal is not intended as financial advice or a final product. Instead, it is an evolving model and presentation tool — built to explore whether mathematical rigor and optimization can consistently outperform intuition in dynamic financial systems.
-        """)
+    This dashboard reflects a structured, engineering-first approach to market modeling.  
+    It was developed as part of the academic study "Engineering, Optimization, and Comparison of Algorithmic Trading,” which blends principles from mechanical systems analysis, data science, and quantitative finance. 
+
+    The Skarre Signal is not intended as financial advice or a final product. Instead, it is an evolving model and presentation tool — built to explore whether mathematical rigor and optimization can consistently outperform intuition in dynamic financial systems.
+    """)
+# DERIVATIVE DIAGNOSTICS
+# --- Derivative Diagnostics Page ---
 elif page == "Derivative Diagnostics":
     st.title("Derivative Diagnostics")
     st.markdown("""
-    Explore Skarre’s **slope** and **acceleration** signals for any ticker and timeframe.
-    - **Slope (1st derivative)** = rate of change (momentum)  
-    - **Acceleration (2nd derivative)** = change of momentum (regime shifts)
+Explore Skarre’s **slope** and **acceleration** signals for any ticker and timeframe.
+- **Slope (1st derivative)** = rate of change (momentum)  
+- **Acceleration (2nd derivative)** = change of momentum (regime shifts)
 
-    Use the controls below to select your ticker, date range, and thresholds.
-    """)
+Use the controls below to select your ticker, date range, and thresholds.
+""")
 
     # Sidebar controls
     ticker        = st.sidebar.text_input("Ticker Symbol", "SPY").upper()
