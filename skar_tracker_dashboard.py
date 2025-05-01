@@ -127,12 +127,12 @@ elif page == "About":
     buy_hold_drawdown = (buy_hold / buy_hold.cummax() - 1).min()
 
     performance = result.get('performance', {})
-# Safely get final equity
-if 'equity_curve' in result and not result['equity_curve'].empty:
-    final_equity = result['equity_curve'].iloc[-1]
+# Safely get final buy-and-hold value
+if not buy_hold.empty:
+    final_buy_hold = buy_hold.iloc[-1]
 else:
-    st.warning("⚠ 'equity_curve' missing or empty; defaulting to 1.0")
-    final_equity = 1.0
+    st.warning("⚠ 'buy_hold' series is empty; defaulting to 1.0")
+    final_buy_hold = 1.0
 comparison_df = pd.DataFrame({
     "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
     "Skarre Signal": [
