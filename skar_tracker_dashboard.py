@@ -126,26 +126,28 @@ elif page == "About":
     buy_hold = (1 + price.pct_change().fillna(0)).cumprod()
     buy_hold_drawdown = (buy_hold / buy_hold.cummax() - 1).min()
 
-    comparison_df = pd.DataFrame({
-        "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
-        "Skarre Signal": [
-            f"{(result['equity_curve'].iloc[-1] - 1) * 100:.1f}%",
-            f"{result['performance']['Sharpe']:.2f}",
-            f"{result['performance']['Max Drawdown'] * 100:.0f}%",
-            f"{result['performance']['Win Rate'] * 100:.0f}%",
-            f"{result['performance']['Trade Frequency']:.1f}"
-        ],
-        "SPY (Buy & Hold)": [
-            f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
-            "N/A",
-            f"{buy_hold_drawdown * 100:.0f}%",
-            "N/A",
-            "1"
-        ]
-    }).set_index("Metric")
+    performance = result.get('performance', {})
 
-    with st.expander("View Live Performance Table"):
-        st.dataframe(comparison_df)
+comparison_df = pd.DataFrame({
+    "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
+    "Skarre Signal": [
+        f"{(result['equity_curve'].iloc[-1] - 1) * 100:.1f}%",
+        f"{performance.get('Sharpe', np.nan):.2f}",
+        f"{performance.get('Max Drawdown', np.nan) * 100:.0f}%",
+        f"{performance.get('Win Rate', np.nan) * 100:.0f}%",
+        f"{performance.get('Trade Frequency', np.nan):.1f}"
+    ],
+    "SPY (Buy & Hold)": [
+        f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
+        "N/A",
+        f"{buy_hold_drawdown * 100:.0f}%",
+        "N/A",
+        "1"
+    ]
+}).set_index("Metric")
+
+with st.expander("View Live Performance Table"):
+    st.dataframe(comparison_df)
 
     st.markdown("""
     *Note: These values are computed using fixed thresholds (entry = 0.5, exit = –0.5) over the 2020–2024 period, and are subject to change based on market conditions.*
