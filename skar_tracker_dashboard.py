@@ -141,37 +141,27 @@ if not trade_log.empty:
 else:
     final_equity = 1.0
 
-# Build your metrics table
-table_data = {
+# Build your metrics table as a DataFrame
+comparison_df = pd.DataFrame({
+    "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
     "Skarre Signal": [
         f"{(final_equity - 1) * 100:.1f}%",
-        f"{result['metrics']['sharpe']:.2f}",
-        f"{result['metrics']['max_drawdown'] * 100:.0f}%",
+        f"{result['metrics'].get('sharpe', 0):.2f}",
+        f"{result['metrics'].get('max_drawdown', 0) * 100:.0f}%",
         f"{(result['metrics'].get('win_rate', 0) * 100):.0f}%",
-        f"{result['metrics']['trade_frequency']:.1f}"
+        f"{result['metrics'].get('trade_frequency', 0):.1f}"
+    ],
+    "SPY (Buy & Hold)": [
+        f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
+        "N/A",
+        f"{buy_hold_drawdown * 100:.0f}%",
+        "N/A",
+        "1"
     ]
-}
+}).set_index("Metric")
 
-st.table(table_data)
-st.table(table_data)
-"Skarre Signal": [
-    f"{(final_equity - 1) * 100:.1f}%",
-    f"{result['metrics'].get('sharpe', 0):.2f}",
-    f"{result['metrics'].get('max_drawdown', 0) * 100:.0f}%",
-    f"{(result['metrics'].get('win_rate', 0) * 100):.0f}%",
-    f"{result['metrics'].get('trade_frequency', 0):.1f}"
-],
-        "SPY (Buy & Hold)": [
-            f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
-            "N/A",
-            f"{buy_hold_drawdown * 100:.0f}%",
-            "N/A",
-            "1"
-        ]
-    }).set_index("Metric")
-
-    with st.expander("View Live Performance Table"):
-        st.dataframe(comparison_df)
+with st.expander("View Live Performance Table"):
+    st.dataframe(comparison_df)
 
     st.markdown("""
     *Note: These values are computed using fixed thresholds (entry = 0.5, exit = –0.5) over the 2020–2024 period, and are subject to change based on market conditions.*
