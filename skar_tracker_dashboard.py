@@ -128,7 +128,10 @@ elif page == "About":
 
     comparison_df = pd.DataFrame({
         "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
-    
+    print(type(result))
+print(result.keys())
+print(result['metrics'])
+print(result['trade_log'])
 # Safely extract final equity (avoids indexing empty DataFrame)
 trade_log = result["trade_log"]
 if not trade_log.empty:
