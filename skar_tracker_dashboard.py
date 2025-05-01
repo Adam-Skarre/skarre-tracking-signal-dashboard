@@ -127,8 +127,10 @@ elif page == "About":
     buy_hold_drawdown = (buy_hold / buy_hold.cummax() - 1).min()
 
     comparison_df = pd.DataFrame({
-        "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
-    print(type(result))
+    "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"]
+})
+
+print(type(result))
 print(result.keys())
 print(result['metrics'])
 print(result['trade_log'])
