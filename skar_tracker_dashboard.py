@@ -161,7 +161,7 @@ with st.expander("View Live Performance Table"):
     """)
 # DERIVATIVE DIAGNOSTICS
 # --- Derivative Diagnostics Page ---
-elif page == "Derivative Diagnostics":
+if page == "Derivative Diagnostics":
     st.title("Derivative Diagnostics")
     st.markdown("""
 Explore Skarre’s **slope** and **acceleration** signals for any ticker and timeframe.
