@@ -142,7 +142,11 @@ else:
     final_equity = 1.0
 
 # Build your metrics table as a DataFrame
-comparison_df = pd.DataFrame({
+if not buy_hold.empty:
+    buy_hold_final = buy_hold.iloc[-1]
+else:
+    buy_hold_final = 1.0  # fallback baseline (no growth)
+    comparison_df = pd.DataFrame({
     "Metric": ["Annualized Return", "Sharpe Ratio", "Max Drawdown", "Win Rate", "Trades per Year"],
     "Skarre Signal": [
         f"{(final_equity - 1) * 100:.1f}%",
@@ -152,7 +156,7 @@ comparison_df = pd.DataFrame({
         f"{result['metrics'].get('trade_frequency', 0):.1f}"
     ],
     "SPY (Buy & Hold)": [
-        f"{(buy_hold.iloc[-1] - 1) * 100:.1f}%",
+        f"{(buy_hold_final - 1) * 100:.1f}%",
         "N/A",
         f"{buy_hold_drawdown * 100:.0f}%",
         "N/A",
